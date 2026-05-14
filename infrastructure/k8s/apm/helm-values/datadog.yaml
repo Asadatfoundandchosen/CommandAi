@@ -1,0 +1,48 @@
+# Values for https://github.com/DataDog/helm-charts/tree/main/charts/datadog
+# Install: helm upgrade --install datadog-agent datadog/datadog -n datadog -f datadog.yaml
+targetSystem: "linux"
+
+datadog:
+  # apiKey: <set via --set or ExternalSecrets; prefer apiKeyExistingSecret>
+  apiKeyExistingSecret: datadog-secret
+
+  site: datadoghq.com
+  clusterName: "1commandai-dev"
+
+  tags:
+    - "env:dev"
+    - "project:1commandai"
+
+  kubeStateMetricsCore:
+    enabled: true
+
+  apm:
+    portEnabled: true
+    socketEnabled: true
+
+  dogstatsd:
+    useSocketVolume: true
+    nonLocalTraffic: true
+    tagCardinality: orchestrator
+
+  logs:
+    enabled: false
+    containerCollectAll: false
+
+  processAgent:
+    processCollection: true
+
+clusterAgent:
+  enabled: true
+  replicas: 2
+
+agents:
+  containers:
+    agent:
+      resources:
+        requests:
+          cpu: 200m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi

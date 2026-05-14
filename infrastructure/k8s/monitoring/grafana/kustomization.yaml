@@ -1,0 +1,17 @@
+# Provisions dashboards into any namespace where Grafana sidecar watches (searchNamespace: ALL in values).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: monitoring
+configMapGenerator:
+  - name: grafana-dashboards-1commandai
+    options:
+      labels:
+        grafana_dashboard: "1"
+        app.kubernetes.io/part-of: 1commandai
+    files:
+      - dashboards/cluster-overview.json
+      - dashboards/api-performance.json
+      - dashboards/slo-reliability.json
+      - dashboards/database-connections.json
+      - dashboards/queue-depth.json
+      - dashboards/mongodb-shard-chunks.json

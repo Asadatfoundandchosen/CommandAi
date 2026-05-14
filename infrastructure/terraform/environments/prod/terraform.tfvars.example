@@ -1,0 +1,6 @@
+# Copy to terraform.tfvars (gitignored) or pass -var-file.
+# aws_region         = "us-east-1"
+# project_name       = "1commandai"
+# environment        = "prod"
+# availability_zones = ["us-east-1a", "us-east-1b", "us-east-1c"]
+# aws_skip_credential_checks = false

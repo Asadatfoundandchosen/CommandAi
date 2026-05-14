@@ -1,0 +1,19 @@
+# Patch argocd-cm after install: set public URL + Dex GitHub connector.
+# Replace ARGOCD_PUBLIC_URL and wire secrets (see dex-github-secret.example.yaml or Vault → ExternalSecrets).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+data:
+  url: https://ARGOCD_PUBLIC_URL
+  dex.config: |
+    connectors:
+      - type: github
+        id: github
+        name: GitHub
+        config:
+          clientID: $dex.github.clientID
+          clientSecret: $dex.github.clientSecret
+          orgs:
+            - name: 1commandai

@@ -1,0 +1,9 @@
+# Mesh-wide STRICT mTLS: all workloads must present Istio-issued client certificates.
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default-strict-mtls
+  namespace: istio-system
+spec:
+  mtls:
+    mode: STRICT

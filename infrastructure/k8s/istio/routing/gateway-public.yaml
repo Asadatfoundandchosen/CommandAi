@@ -1,0 +1,17 @@
+# Edge ingress into the mesh via istio-ingressgateway.
+# Replace hosts and add credentialName for TLS in production.
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: public-gateway
+  namespace: istio-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "*"

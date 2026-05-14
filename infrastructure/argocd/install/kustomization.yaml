@@ -1,0 +1,7 @@
+# Pin the Argo CD release used for reproducible installs.
+# Apply: kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+#         kubectl apply -k infrastructure/argocd/install
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - https://raw.githubusercontent.com/argoproj/argo-cd/v2.13.4/manifests/install.yaml

@@ -1,0 +1,40 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "gridPos": { "h": 5, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "content": "### Jaeger — trace visualization\n\n1. Open **Explore**, choose the **Jaeger** datasource.\n2. Select **service** (e.g. `platform-api`), **operation**, and optional tags **`org.id`**, **`user.id`**.\n3. Confirm **OTLP** from the API reaches the **collector** (`OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`).",
+        "mode": "markdown"
+      },
+      "title": "How to view traces",
+      "type": "text"
+    },
+    {
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 5 },
+      "id": 2,
+      "options": {
+        "content": "### Sampling\n\n- **Dev**: 100% (default unless `OTEL_TRACES_SAMPLER_ARG` is set).\n- **Prod**: set **`DEPLOY_ENV=prod`** on the Deployment for **10%** head sampling.",
+        "mode": "markdown"
+      },
+      "title": "Sampling (API)",
+      "type": "text"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["1commandai", "jaeger", "tracing"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "1CommandAI — Trace overview (Jaeger)",
+  "uid": "1cmd-trace-overview",
+  "version": 1,
+  "weekStart": ""
+}

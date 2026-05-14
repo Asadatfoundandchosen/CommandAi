@@ -1,0 +1,152 @@
+import type { Queue } from "bullmq";
+
+import { queues } from "./queues/index.js";
+import type { NotificationJob } from "./queues/notification.queue.js";
+import type { SignalJob } from "./queues/signal.queue.js";
+
+/** In-memory overrides (lost on restart — persist in DB for production). */
+const scheduleOverrides = new Map<
+  string,
+  Partial<{ cron: string; timezone: string }>
+>();
+
+export type ScheduledJobEntry =
+  | {
+      kind: "notification";
+      name: string;
+      queue: (typeof queues)["notifications"];
+      cron: string;
+      timezone: string;
+      data: NotificationJob;
+    }
+  | {
+      kind: "signal";
+      name: string;
+      queue: (typeof queues)["signals"];
+      cron: string;
+      timezone: string;
+      data: SignalJob;
+    };
+
+/** Cron schedules — BullMQ `repeat.pattern` + `tz` (IANA, e.g. `UTC`, `America/New_York`). */
+export const scheduledJobs: ScheduledJobEntry[] = [
+  {
+    kind: "notification",
+    name: "daily-credit-alert",
+    queue: queues.notifications,
+    cron: "0 9 * * *",
+    timezone: "UTC",
+    data: {
+      orgId: "system",
+      recipientKey: "credit-alert",
+      templateId: "credit-summary",
+      payload: { type: "credit-summary" },
+    },
+  },
+  {
+    kind: "signal",
+    name: "hourly-signal-aggregation",
+    queue: queues.signals,
+    cron: "0 * * * *",
+    timezone: "UTC",
+    data: {
+      signalId: "scheduled-hourly",
+      orgId: "system",
+      agentId: "signal-aggregator",
+      payload: { type: "aggregate" },
+    },
+  },
+  {
+    kind: "notification",
+    name: "weekly-report",
+    queue: queues.notifications,
+    cron: "0 8 * * 1",
+    timezone: "UTC",
+    data: {
+      orgId: "system",
+      recipientKey: "weekly-report",
+      templateId: "weekly-report",
+      payload: { type: "weekly-report" },
+    },
+  },
+];
+
+function effectiveSchedule(job: ScheduledJobEntry): {
+  cron: string;
+  timezone: string;
+} {
+  const o = scheduleOverrides.get(job.name);
+  return {
+    cron: o?.cron ?? job.cron,
+    timezone: o?.timezone ?? job.timezone,
+  };
+}
+
+async function removeRepeatableForJob(
+  queue: Queue,
+  jobName: string,
+): Promise<void> {
+  const list = await queue.getRepeatableJobs();
+  for (const r of list) {
+    if (r.name === jobName || r.key.includes(jobName)) {
+      await queue.removeRepeatableByKey(r.key);
+    }
+  }
+}
+
+const repeatOpts = (job: ScheduledJobEntry, cron: string, timezone: string) =>
+  ({
+    repeat: {
+      pattern: cron,
+      tz: timezone,
+      key: job.name,
+      immediately: true,
+    },
+  }) as const;
+
+async function registerRepeatable(job: ScheduledJobEntry): Promise<void> {
+  const { cron, timezone } = effectiveSchedule(job);
+  await removeRepeatableForJob(job.queue, job.name);
+  const opts = repeatOpts(job, cron, timezone);
+  switch (job.kind) {
+    case "notification":
+      await queues.notifications.add(job.name, job.data, opts);
+      return;
+    case "signal":
+      await queues.signals.add(job.name, job.data, opts);
+      return;
+  }
+}
+
+/** Register repeatable jobs. Idempotent per `repeat.key`. `immediately` runs a catch-up if the slot was missed (process was down). */
+export async function initScheduler(): Promise<void> {
+  for (const job of scheduledJobs) {
+    await registerRepeatable(job);
+  }
+}
+
+export function setScheduleOverride(
+  name: string,
+  patch: Partial<{ cron: string; timezone: string }>,
+): void {
+  scheduleOverrides.set(name, {
+    ...scheduleOverrides.get(name),
+    ...patch,
+  });
+}
+
+export function getScheduleOverrides(): ReadonlyMap<
+  string,
+  Partial<{ cron: string; timezone: string }>
+> {
+  return scheduleOverrides;
+}
+
+/** Re-register one job after admin PATCH (uses current overrides). */
+export async function resyncScheduledJob(name: string): Promise<void> {
+  const job = scheduledJobs.find((j) => j.name === name);
+  if (!job) {
+    throw new Error(`Unknown schedule: ${name}`);
+  }
+  await registerRepeatable(job);
+}

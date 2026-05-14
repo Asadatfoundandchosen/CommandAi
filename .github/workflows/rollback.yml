@@ -1,0 +1,82 @@
+# Manual rollback (workflow_dispatch) or invoked by Deploy health-check failure.
+# Requires: ARGOCD_SERVER, ARGOCD_AUTH_TOKEN (or ARGOCD_PASSWORD + ARGOCD_USERNAME) for CLI.
+name: Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      target_revision:
+        description: Argo CD history ID (numeric) or git revision / tag to sync back to
+        required: true
+        type: string
+
+concurrency:
+  group: rollback-${{ inputs.environment }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  deployments: write
+
+env:
+  ARGOCD_VERSION: v2.13.4
+
+jobs:
+  rollback:
+    name: Rollback ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Argo CD CLI
+        run: |
+          curl -sSL -o /tmp/argocd https://github.com/argoproj/argo-cd/releases/download/${{ env.ARGOCD_VERSION }}/argocd-linux-amd64
+          chmod +x /tmp/argocd
+          sudo mv /tmp/argocd /usr/local/bin/argocd
+
+      - name: Argo CD rollback / sync to previous revision
+        id: argo
+        env:
+          ARGOCD_SERVER: ${{ secrets.ARGOCD_SERVER }}
+          ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_AUTH_TOKEN }}
+          ARGOCD_OPTS: --grpc-web
+        run: |
+          set -euo pipefail
+          APP="platform-api-${{ inputs.environment }}"
+          REV="${{ inputs.target_revision }}"
+          if [ -z "${ARGOCD_SERVER:-}" ] || [ -z "${ARGOCD_AUTH_TOKEN:-}" ]; then
+            echo "cli=skipped" >> "$GITHUB_OUTPUT"
+            echo "::warning::Set ARGOCD_SERVER and ARGOCD_AUTH_TOKEN repository secrets to run CLI rollback in CI."
+            echo "Manual: argocd app rollback $APP $REV (numeric history) or argocd app sync $APP --revision <git-ref>"
+            exit 0
+          fi
+          echo "cli=ran" >> "$GITHUB_OUTPUT"
+          argocd app get "$APP" --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" $ARGOCD_OPTS >/dev/null
+          if [[ "$REV" =~ ^[0-9]+$ ]]; then
+            argocd app rollback "$APP" "$REV" --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" $ARGOCD_OPTS
+          else
+            argocd app sync "$APP" --revision "$REV" --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" $ARGOCD_OPTS
+          fi
+
+      - name: Slack — rollback complete
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then echo "SLACK_WEBHOOK_URL not set; skipping Slack"; exit 0; fi
+          STATUS="${{ job.status }}"
+          COLOR="$([ "$STATUS" == 'success' ] && echo 'good' || echo 'danger')"
+          NOTE=""
+          if [ "${{ steps.argo.outputs.cli }}" = "skipped" ]; then NOTE=" (Argo CLI skipped — add secrets)"; fi
+          curl -sS -X POST -H 'Content-type: application/json' \
+            --data "{\"attachments\":[{\"color\":\"${COLOR}\",\"text\":\"*Rollback ${{ inputs.environment }}* ${STATUS}${NOTE} → \`${{ inputs.target_revision }}\`\",\"fields\":[{\"title\":\"Actor\",\"value\":\"${{ github.actor }}\",\"short\":true},{\"title\":\"Run\",\"value\":\"<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>\"}]}]}" \
+            "$SLACK_WEBHOOK_URL"

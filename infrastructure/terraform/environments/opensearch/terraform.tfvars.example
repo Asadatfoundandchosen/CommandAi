@@ -1,0 +1,12 @@
+aws_region = "us-east-1"
+domain_name = "1cmd-audit-dev"
+
+vpc_id             = "vpc-xxxxxxxx"
+private_subnet_ids = ["subnet-a", "subnet-b", "subnet-c"]
+allowed_security_group_ids = ["sg-xxxxxxxx"]
+
+# IAM role ARN used by the API / workers (or EKS node role if using instance profile)
+opensearch_access_principal_arns = ["arn:aws:iam::123456789012:role/eks-node-role"]
+
+# Optional warm tier (2 x UltraWarm nodes — tune warm_type for capacity)
+# warm_enabled = true

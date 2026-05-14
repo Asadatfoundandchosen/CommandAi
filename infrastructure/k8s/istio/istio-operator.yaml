@@ -1,0 +1,21 @@
+# Install: istioctl install -f istio-operator.yaml -y
+# Requires: istioctl 1.20+ matching your target control plane minor version.
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  name: 1commandai-istio
+  namespace: istio-system
+spec:
+  profile: production
+
+  meshConfig:
+    # Envoy access logs (stdout) for Loki / CloudWatch / sidecar log collectors
+    accessLogFile: /dev/stdout
+    accessLogEncoding: JSON
+    # Prefer mesh telemetry to be scraped by Prometheus (sidecar + control plane metrics)
+    enablePrometheusMerge: true
+
+  values:
+    global:
+      logging:
+        level: "default:info"

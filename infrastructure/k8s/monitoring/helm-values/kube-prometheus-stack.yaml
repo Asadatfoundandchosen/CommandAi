@@ -1,0 +1,75 @@
+# Values for: helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack -n monitoring -f kube-prometheus-stack.yaml
+# Align ServiceMonitor label `release` below with your Helm release name (default here matches chart convention).
+nameOverride: ""
+fullnameOverride: ""
+
+defaultRules:
+  create: true
+
+prometheus:
+  prometheusSpec:
+    # For rolling 30d SLO windows (`prometheusrules/slo-*.yaml`), use retention: 30d or longer.
+    retention: 15d
+    scrapeInterval: 15s
+    evaluationInterval: 15s
+    enableAdminAPI: false
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    serviceMonitorSelector: {}
+    serviceMonitorNamespaceSelector: {}
+    podMonitorSelector: {}
+    ruleSelector: {}
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 50Gi
+
+alertmanager:
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+
+grafana:
+  enabled: true
+  # Prefer: admin.existingSecret + passwordKey (do not commit real passwords).
+  adminPassword: change-me-in-production
+  persistence:
+    enabled: true
+    type: pvc
+    size: 10Gi
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: ALL
+  # GitHub OAuth: create Secret `grafana-github-oauth` (see ../secrets/grafana-github-oauth.example.yaml)
+  # and uncomment envFromSecret + grafana.ini block, or set GF_* via extraEnvFromSecret.
+  # grafana.ini:
+  #   server:
+  #     root_url: https://grafana.example.com
+  #   auth.github:
+  #     enabled: true
+  #     allow_sign_up: true
+  #     scopes: user:email,read:org
+  #     auth_url: https://github.com/login/oauth/authorize
+  #     token_url: https://github.com/login/oauth/access_token
+  #     api_url: https://api.github.com/user
+  #     allowed_organizations: 1commandai
+  # envFromSecrets:
+  #   - name: grafana-github-oauth
+
+prometheus-node-exporter:
+  enabled: true
+
+kube-state-metrics:
+  enabled: true

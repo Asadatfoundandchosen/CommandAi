@@ -1,0 +1,39 @@
+# SyncFail: notify Slack when Argo CD sync fails (create Secret platform-hook-secrets first).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: platform-api-syncfail-slack
+  annotations:
+    argocd.argoproj.io/hook: SyncFail
+    argocd.argoproj.io/hook-delete-policy: HookFailed
+spec:
+  ttlSecondsAfterFinished: 600
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: syncfail-alert
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: notify
+          image: curlimages/curl:8.5.0
+          env:
+            - name: SLACK_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: platform-hook-secrets
+                  key: slack-webhook-url
+                  optional: true
+          command:
+            - /bin/sh
+            - -c
+            - |
+              if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then
+                echo "platform-hook-secrets/slack-webhook-url missing; skipping Slack"
+                exit 0
+              fi
+              MSG="Argo CD SyncFail hook: platform-api (check Application status in Argo CD UI)"
+              curl -fsS -X POST -H "Content-type: application/json" \
+                --data "{\"text\":\"${MSG}\"}" \
+                "$SLACK_WEBHOOK_URL"

@@ -1,0 +1,30 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "gridPos": { "h": 14, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "code": { "language": "markdown", "showLineNumbers": false },
+        "content": "## 1CommandAI — S3 files bucket: **cost & storage** (runbook)\n\n### Lifecycle (Terraform `s3-files-bucket/lifecycle.tf`)\n- **`uploads/`** — transition to **Glacier** after **90 days**; **expire** current object versions after **365 days** (align with product: move cold, delete after one year).\n- **`audit-exports/`** — **no expiration** on completed objects (retain indefinitely). Rule only **aborts incomplete multipart uploads** after 7 days (AWS requires at least one lifecycle action per rule).\n\n### CloudWatch (namespace `AWS/S3`)\nAdd a **CloudWatch** Grafana datasource (`uid` e.g. `cloudwatch`) and panels for:\n| Metric | Dimensions | Use |\n|--------|------------|-----|\n| `BucketSizeBytes` | `BucketName`, `StorageType` (`StandardStorage`, `GlacierStorage`, …) | **Capacity cost** drivers |\n| `NumberOfObjects` | `BucketName`, `StorageType` | Growth / lifecycle effectiveness |\n| `AllRequests` | `BucketName`, `Filter` (optional) | Traffic |\n\n**Console:** *S3 → bucket → Metrics* for quick charts; **Cost Explorer** filters by S3 service and bucket tag `Project=1commandai`.\n\n### Alerts (suggested)\n- **Glacier / Standard mix:** rising `BucketSizeBytes` for `GlacierStorage` after lifecycle age.\n- **4xx/5xx** on `AllRequests` if you export request metrics.\n"
+      },
+      "title": "S3 lifecycle & CloudWatch runbook",
+      "type": "text"
+    }
+  ],
+  "refresh": "1h",
+  "schemaVersion": 39,
+  "tags": ["1commandai", "s3", "cost", "storage"],
+  "templating": { "list": [] },
+  "time": { "from": "now-30d", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "1CommandAI — S3 files storage & cost",
+  "uid": "1cmd-s3-files-storage-costs",
+  "version": 1,
+  "weekStart": ""
+}

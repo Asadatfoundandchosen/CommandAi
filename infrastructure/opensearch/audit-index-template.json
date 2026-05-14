@@ -1,0 +1,23 @@
+{
+  "index_patterns": ["audit-*"],
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 1
+    },
+    "mappings": {
+      "properties": {
+        "timestamp": { "type": "date" },
+        "org_id": { "type": "keyword" },
+        "user_id": { "type": "keyword" },
+        "action": { "type": "keyword" },
+        "resource": { "type": "keyword" },
+        "resource_id": { "type": "keyword" },
+        "changes": { "type": "object", "enabled": false },
+        "ip_address": { "type": "ip" },
+        "user_agent": { "type": "text" }
+      }
+    }
+  },
+  "priority": 200
+}

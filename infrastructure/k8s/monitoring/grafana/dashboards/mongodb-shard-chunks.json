@@ -1,0 +1,37 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [
+    {
+      "title": "MongoDB Atlas (chunk / sharding metrics)",
+      "type": "link",
+      "url": "https://cloud.mongodb.com/",
+      "icon": "external link"
+    }
+  ],
+  "panels": [
+    {
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "content": "## Sharded cluster — chunk distribution\n\n- **Source of truth:** MongoDB **Atlas** (project → sharded cluster → **Metrics** / sharding & chunk/balancer views in UI).\n- **Script:** `scripts/mongodb/shard-app-collections.mongosh.js` — **doc:** `docs/mongodb-sharding-strategy.md`.\n- **Grafana** does not include Atlas chunk metrics by default; add **MongoDB Exporter** / **PMM** panels here if you expose metrics.\n- **Shard key:** `{ org_id: \"hashed\" }` on tenant collections in `app_db`.\n- **Atlas** manages shard processes and automatic chunk migration.",
+        "mode": "markdown"
+      },
+      "title": "Where to monitor chunks",
+      "type": "text"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 39,
+  "tags": ["1commandai", "mongodb", "sharding"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "1CommandAI — MongoDB sharding & chunks",
+  "uid": "1cmd-mongo-shard-chunks",
+  "version": 1,
+  "weekStart": ""
+}

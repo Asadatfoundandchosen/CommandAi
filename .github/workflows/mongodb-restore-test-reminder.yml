@@ -1,0 +1,23 @@
+# Reminder: quarterly PITR / non-prod restore drill (data + runbook evidence).
+# Does not run an Atlas restore — platform owners run the test per docs/runbooks/mongodb-restore.md
+name: MongoDB restore test reminder
+
+on:
+  schedule:
+    # 1st of Jan, Apr, Jul, Oct at 10:00 UTC
+    - cron: "0 10 1 1,4,7,10 *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reminder
+        run: |
+          echo "::notice::Scheduled quarterly check: run MongoDB Atlas PITR/restore drill and record result."
+          echo "Runbook: docs/runbooks/mongodb-restore.md"
+          echo "PITR script: scripts/restore-mongodb.sh"
+          echo "Terraform: infrastructure/terraform/modules/mongodb-atlas (mongodbatlas_cloud_backup_schedule)"

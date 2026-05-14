@@ -1,0 +1,33 @@
+# Per-service DestinationRules: enforce ISTIO_MUTUAL for traffic to these hosts.
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: api-mtls
+  namespace: 1commandai-apps
+spec:
+  host: api
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: worker-mtls
+  namespace: 1commandai-apps
+spec:
+  host: worker
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: frontend-mtls
+  namespace: 1commandai-apps
+spec:
+  host: frontend
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL

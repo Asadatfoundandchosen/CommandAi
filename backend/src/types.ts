@@ -1,0 +1,20 @@
+/** Inversify injection tokens (use symbols to avoid name collisions). */
+export const TYPES = {
+  HierarchyValidator: Symbol.for("HierarchyValidator"),
+  AccountRepository: Symbol.for("AccountRepository"),
+  AccountService: Symbol.for("AccountService"),
+  DepartmentRepository: Symbol.for("DepartmentRepository"),
+  DepartmentService: Symbol.for("DepartmentService"),
+  OrganizationRepository: Symbol.for("OrganizationRepository"),
+  OrganizationService: Symbol.for("OrganizationService"),
+  UserRepository: Symbol.for("UserRepository"),
+  UserService: Symbol.for("UserService"),
+  AgentService: Symbol.for("AgentService"),
+  AuthService: Symbol.for("AuthService"),
+  WebhookRepository: Symbol.for("WebhookRepository"),
+  WebhookService: Symbol.for("WebhookService"),
+  AuditService: Symbol.for("AuditService"),
+  SearchService: Symbol.for("SearchService"),
+  SignalService: Symbol.for("SignalService"),
+  FileService: Symbol.for("FileService"),
+} as const;

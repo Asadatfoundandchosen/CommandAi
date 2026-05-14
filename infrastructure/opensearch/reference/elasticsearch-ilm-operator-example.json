@@ -1,0 +1,26 @@
+{
+  "_comment": "Elasticsearch **ILM** (self-managed ES 8.x) — **not** used on Amazon OpenSearch. Use `infrastructure/opensearch/ism/1commandai-lifecycle-policy.json` (ISM) for AWS. Apply with `PUT _ilm/policy/1commandai-lifecycle` and index settings `index.lifecycle.name`.",
+  "policy": {
+    "phases": {
+      "hot": {
+        "actions": {
+          "rollover": {
+            "max_size": "50gb",
+            "max_age": "7d"
+          }
+        }
+      },
+      "warm": {
+        "min_age": "7d",
+        "actions": {
+          "forcemerge": { "max_num_segments": 1 },
+          "shrink": { "number_of_shards": 1 }
+        }
+      },
+      "delete": {
+        "min_age": "90d",
+        "actions": { "delete": {} }
+      }
+    }
+  }
+}

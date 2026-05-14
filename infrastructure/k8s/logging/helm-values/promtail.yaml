@@ -1,0 +1,16 @@
+# grafana/promtail — DaemonSet shipping pod logs to Loki. Set `clients[0].url` to your Loki write URL.
+# Optional: add `config.snippets.pipelineStages` to extract JSON fields into Loki labels (`service`, `org_id`, `level`).
+config:
+  clients:
+    - url: http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push
+
+daemonset:
+  enabled: true
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

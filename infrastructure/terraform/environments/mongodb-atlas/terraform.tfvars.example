@@ -1,0 +1,17 @@
+# Copy to terraform.tfvars (not committed) and set values. Use: terraform plan -var-file=terraform.tfvars
+# Atlas API keys: https://www.mongodb.com/docs/atlas/configure-api-access/
+aws_region       = "us-east-1"
+atlas_public_key  = "xxxx"
+atlas_private_key = "xxxx"
+atlas_org_id     = "xxxxxxxxxxxxxxxxxxxxxxxx"
+atlas_project_name = "1commandai-prod"
+
+# From primary AWS/EKS environment outputs (e.g. prod VPC).
+eks_vpc_id   = "vpc-xxxxxxxx"
+eks_vpc_cidr = "10.0.0.0/16"
+
+# Private route table IDs (strings) that send default route via NAT; add static route to Atlas.
+private_route_table_ids = ["rtb-xxx", "rtb-yyy", "rtb-zzz"]
+
+# Optional: must not overlap eks_vpc_cidr
+# atlas_container_cidr = "10.8.0.0/21"

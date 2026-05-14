@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-api-staging
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: 1commandai
+    environment: staging
+spec:
+  project: "1commandai"
+  source:
+    repoURL: https://github.com/1commandai/platform.git
+    targetRevision: main
+    path: k8s/overlays/staging
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: "1commandai-staging"
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true

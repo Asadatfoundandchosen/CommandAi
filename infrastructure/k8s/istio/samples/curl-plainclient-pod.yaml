@@ -1,0 +1,14 @@
+# Pod without Istio sidecar — use to validate STRICT mTLS rejects plain HTTP to meshed services.
+# Apply to a namespace that does NOT force injection (e.g. default), or rely on sidecar.istio.io/inject: "false".
+apiVersion: v1
+kind: Pod
+metadata:
+  name: curl-plainclient
+  annotations:
+    sidecar.istio.io/inject: "false"
+spec:
+  containers:
+    - name: curl
+      image: curlimages/curl:8.5.0
+      command: ["sleep", "infinity"]
+  restartPolicy: Always

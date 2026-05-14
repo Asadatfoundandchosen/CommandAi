@@ -1,0 +1,49 @@
+# Example routing for 1CommandAI services (adjust ports and subsets to match your Deployments).
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: api
+  namespace: 1commandai-apps
+spec:
+  hosts:
+    - api
+    - api.1commandai-apps.svc.cluster.local
+  http:
+    - name: default
+      route:
+        - destination:
+            host: api
+            port:
+              number: 3000
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: worker
+  namespace: 1commandai-apps
+spec:
+  hosts:
+    - worker
+    - worker.1commandai-apps.svc.cluster.local
+  http:
+    - route:
+        - destination:
+            host: worker
+            port:
+              number: 3000
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: frontend
+  namespace: 1commandai-apps
+spec:
+  hosts:
+    - frontend
+    - frontend.1commandai-apps.svc.cluster.local
+  http:
+    - route:
+        - destination:
+            host: frontend
+            port:
+              number: 80

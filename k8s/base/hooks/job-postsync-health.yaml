@@ -1,0 +1,29 @@
+# PostSync: verify /health after sync (same namespace as the API Service).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: platform-api-postsync-health
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: postsync-health
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: health
+          image: curlimages/curl:8.5.0
+          args:
+            - -fsS
+            - --retry
+            - "12"
+            - --retry-delay
+            - "5"
+            - --max-time
+            - "300"
+            - http://platform-api/health/live

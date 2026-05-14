@@ -1,0 +1,66 @@
+# Merge under the top-level `alertmanager:` key of kube-prometheus-stack values,
+# or paste `config` into your values patch. Replace secrets via ExternalSecrets / Vault.
+#
+# P1 → PagerDuty (integration key from Secret). P2/P3 → Slack.
+# Inhibit: do not page on API error rate / latency if API-down already fired (same namespace).
+alertmanager:
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      receiver: slack-p3-fallback
+      group_by: ["alertname", "cluster", "namespace", "service"]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+      routes:
+        - matchers:
+            - severity="p1"
+          receiver: pagerduty-p1
+          continue: false
+        - matchers:
+            - severity=~"p2|p3"
+          receiver: slack-p2-p3
+    receivers:
+      - name: slack-p3-fallback
+        slack_configs:
+          - channel: "#alerts-fallback"
+            send_resolved: true
+            title: "{{ .CommonAnnotations.summary }}"
+            text: |-
+              {{ .CommonAnnotations.description }}
+              {{ if .CommonAnnotations.runbook_url }}Runbook: {{ .CommonAnnotations.runbook_url }}{{ end }}
+            api_url_file: /etc/alertmanager/secrets/alertmanager-external-secrets/slack_api_url
+      - name: pagerduty-p1
+        pagerduty_configs:
+          - send_resolved: true
+            description: |-
+              {{ .CommonAnnotations.description }}
+              {{ if .CommonAnnotations.runbook_url }}Runbook: {{ .CommonAnnotations.runbook_url }}{{ end }}
+            severity: critical
+            routing_key_file: /etc/alertmanager/secrets/alertmanager-external-secrets/pagerduty_routing_key
+      - name: slack-p2-p3
+        slack_configs:
+          - channel: "#alerts-p2-p3"
+            send_resolved: true
+            title: "[{{ .CommonLabels.severity }}] {{ .CommonAnnotations.summary }}"
+            text: |-
+              {{ .CommonAnnotations.description }}
+              {{ if .CommonAnnotations.runbook_url }}Runbook: {{ .CommonAnnotations.runbook_url }}{{ end }}
+            api_url_file: /etc/alertmanager/secrets/alertmanager-external-secrets/slack_api_url
+    inhibit_rules:
+      - source_matchers:
+          - alertname="PlatformAPIDown"
+        target_matchers:
+          - alertname="PlatformAPIHighErrorRate"
+        equal: ["namespace"]
+      - source_matchers:
+          - alertname="PlatformAPIDown"
+        target_matchers:
+          - alertname="PlatformAPIHighLatencyP99"
+        equal: ["namespace"]
+
+  # Mount Secret keys as files for receivers above (paths must match api_url_file / routing_key_file).
+  alertmanagerSpec:
+    secrets:
+      - alertmanager-external-secrets

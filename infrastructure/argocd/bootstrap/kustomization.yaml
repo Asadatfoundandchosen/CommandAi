@@ -1,0 +1,8 @@
+# GitOps apps + project (apply after Argo CD control plane is healthy).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../projects/appproject.yaml
+  - ../applications/application-api-dev.yaml
+  - ../applications/application-api-staging.yaml
+  - ../applications/application-api-prod.yaml

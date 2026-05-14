@@ -1,0 +1,48 @@
+name: SLO monthly report
+
+on:
+  schedule:
+    # First day of month, 09:00 UTC
+    - cron: "0 9 1 * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate SLO Markdown
+        env:
+          PROMETHEUS_URL: ${{ secrets.PROMETHEUS_URL }}
+        run: |
+          if [ -z "${PROMETHEUS_URL:-}" ]; then
+            echo "PROMETHEUS_URL secret not set — skipping live query; emitting template only."
+            echo "## SLO report (dry run — set PROMETHEUS_URL)" > slo-report.md
+            echo "Configure secrets per docs/runbooks/slo-monthly-report.md" >> slo-report.md
+          else
+            bash scripts/slo-monthly-report.sh > slo-report.md
+          fi
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: slo-report-${{ github.run_id }}
+          path: slo-report.md
+
+      # Uncomment and set secrets (SMTP or provider-specific action) to email the report.
+      # - name: Send email
+      #   if: ${{ secrets.SLO_REPORT_EMAIL_TO != '' }}
+      #   uses: dawidd6/action-send-mail@v3
+      #   with:
+      #     server_address: ${{ secrets.SLO_REPORT_SMTP_HOST }}
+      #     server_port: ${{ secrets.SLO_REPORT_SMTP_PORT }}
+      #     username: ${{ secrets.SLO_REPORT_SMTP_USER }}
+      #     password: ${{ secrets.SLO_REPORT_SMTP_PASS }}
+      #     subject: "1CommandAI monthly SLO report"
+      #     to: ${{ secrets.SLO_REPORT_EMAIL_TO }}
+      #     from: ${{ secrets.SLO_REPORT_EMAIL_FROM }}
+      #     body: file://slo-report.md

@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: monitoring
+configMapGenerator:
+  - name: grafana-datasource-loki
+    options:
+      labels:
+        grafana_datasource: "1"
+        app.kubernetes.io/part-of: 1commandai
+    files:
+      - datasources/loki.yaml
+  - name: grafana-dashboards-loki-logs
+    options:
+      labels:
+        grafana_dashboard: "1"
+        app.kubernetes.io/part-of: 1commandai
+    files:
+      - dashboards/logs-error-rate.json
+      - dashboards/logs-volume.json
+      - dashboards/logs-by-org.json

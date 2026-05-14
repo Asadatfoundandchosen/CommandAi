@@ -1,0 +1,56 @@
+{
+  "index_patterns": ["search-*"],
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 1,
+      "analysis": {
+        "tokenizer": {
+          "autocomplete": {
+            "type": "edge_ngram",
+            "min_gram": 2,
+            "max_gram": 20
+          }
+        },
+        "analyzer": {
+          "autocomplete": {
+            "tokenizer": "autocomplete",
+            "filter": ["lowercase"]
+          },
+          "autocomplete_query": {
+            "tokenizer": "standard",
+            "filter": ["lowercase"]
+          }
+        }
+      }
+    },
+    "mappings": {
+      "properties": {
+        "org_id": { "type": "keyword" },
+        "entity_type": { "type": "keyword" },
+        "entity_id": { "type": "keyword" },
+        "title": {
+          "type": "text",
+          "fields": {
+            "autocomplete": {
+              "type": "text",
+              "analyzer": "autocomplete",
+              "search_analyzer": "autocomplete_query"
+            }
+          }
+        },
+        "content": {
+          "type": "text",
+          "fields": {
+            "autocomplete": {
+              "type": "text",
+              "analyzer": "autocomplete",
+              "search_analyzer": "autocomplete_query"
+            }
+          }
+        }
+      }
+    }
+  },
+  "priority": 210
+}

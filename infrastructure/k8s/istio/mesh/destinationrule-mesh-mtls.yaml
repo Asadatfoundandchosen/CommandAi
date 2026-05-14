@@ -1,0 +1,12 @@
+# Default client TLS for mesh traffic (outbound from sidecars uses ISTIO_MUTUAL).
+# Apply alongside STRICT PeerAuthentication.
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: default-mtls-client
+  namespace: istio-system
+spec:
+  host: "*.local"
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL

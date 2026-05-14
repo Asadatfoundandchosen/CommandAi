@@ -1,0 +1,4 @@
+# aws_region         = "us-east-1"
+# project_name       = "1commandai"
+# environment        = "staging"
+# availability_zones = ["us-east-1a", "us-east-1b", "us-east-1c"]

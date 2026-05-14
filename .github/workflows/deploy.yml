@@ -1,0 +1,289 @@
+# Environment promotion + post-deploy health (≤5 min window) + optional auto-rollback + Redis history.
+# Configure reviewers: Settings → Environments → staging (qa-team) / prod (2× prod-team).
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Promotion target (staging or prod only; dev deploys automatically on merge to main)
+        required: true
+        type: choice
+        options:
+          - staging
+          - prod
+
+concurrency:
+  group: ${{ github.event_name == 'workflow_dispatch' && format('deploy-{0}', inputs.target) || format('deploy-dev-{0}', github.sha) }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  deployments: write
+  actions: write
+
+env:
+  NODE_VERSION: "20"
+  IMAGE_NAME: 1commandai/platform
+
+jobs:
+  deploy-dev:
+    name: Deploy to dev
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deployment summary
+        run: |
+          echo "SHA=${{ github.sha }}"
+          echo "Triggered by merge to main → dev auto-deploy"
+
+      - name: Build & deploy (integrate ECR + Argo / kubectl)
+        run: |
+          echo "Replace this step with: docker build, push to ECR, update image tag or trigger Argo CD sync for dev."
+          echo "Example image tag: ${{ env.IMAGE_NAME }}:${{ github.sha }}"
+
+      - name: Record deployment history (Redis)
+        if: success()
+        env:
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_WORKFLOW: ${{ github.workflow }}
+        run: bash scripts/record-deploy-redis.sh dev
+
+      - name: Slack — deployment status
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then echo "SLACK_WEBHOOK_URL not set; skipping Slack"; exit 0; fi
+          STATUS="${{ job.status }}"
+          COLOR="$([ "$STATUS" == 'success' ] && echo 'good' || echo 'danger')"
+          curl -sS -X POST -H 'Content-type: application/json' \
+            --data "{\"attachments\":[{\"color\":\"${COLOR}\",\"text\":\"*Deploy dev* ${STATUS}\",\"fields\":[{\"title\":\"SHA\",\"value\":\"${{ github.sha }}\",\"short\":true},{\"title\":\"Run\",\"value\":\"<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>\"}]}]}" \
+            "$SLACK_WEBHOOK_URL"
+
+  verify-health-dev:
+    name: Post-deploy health (dev)
+    needs: deploy-dev
+    if: needs.deploy-dev.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait before first health check
+        run: sleep 120
+
+      - name: Check /health (within 5 minutes)
+        id: health
+        env:
+          HEALTH_URL: ${{ secrets.HEALTH_CHECK_URL_DEV }}
+        run: |
+          if [ -z "${HEALTH_URL:-}" ]; then
+            echo "HEALTH_CHECK_URL_DEV not set — skipping automated health gate"
+            exit 0
+          fi
+          end=$((SECONDS + 300))
+          while [ "$SECONDS" -lt "$end" ]; do
+            if curl -fsS --max-time 30 "${HEALTH_URL}/health"; then
+              echo "Health OK"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "Health check failed within 5 minutes"
+          exit 1
+
+      - name: Trigger automated rollback (previous commit on main)
+        if: failure() && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          REV="${{ github.event.before }}"
+          if [ "$REV" = "0000000000000000000000000000000000000000" ]; then
+            echo "No parent commit; skipping rollback dispatch"
+            exit 0
+          fi
+          gh workflow run rollback.yml \
+            --repo "${{ github.repository }}" \
+            -f environment=dev \
+            -f "target_revision=$REV"
+
+  deploy-staging:
+    name: Deploy to staging
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'staging'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Deployment summary
+        run: |
+          echo "SHA=${{ github.sha }}"
+          echo "Manual promotion to staging (requires QA approval via Environment protection)"
+
+      - name: Build & deploy (integrate ECR + Argo / kubectl)
+        run: |
+          echo "Replace this step with: pull image tag from dev pipeline or build; promote to staging overlay / Argo sync."
+
+      - name: Record deployment history (Redis)
+        if: success()
+        env:
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_WORKFLOW: ${{ github.workflow }}
+        run: bash scripts/record-deploy-redis.sh staging
+
+      - name: Slack — deployment status
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then echo "SLACK_WEBHOOK_URL not set; skipping Slack"; exit 0; fi
+          STATUS="${{ job.status }}"
+          COLOR="$([ "$STATUS" == 'success' ] && echo 'good' || echo 'danger')"
+          curl -sS -X POST -H 'Content-type: application/json' \
+            --data "{\"attachments\":[{\"color\":\"${COLOR}\",\"text\":\"*Deploy staging* ${STATUS}\",\"fields\":[{\"title\":\"SHA\",\"value\":\"${{ github.sha }}\",\"short\":true},{\"title\":\"Run\",\"value\":\"<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>\"}]}]}" \
+            "$SLACK_WEBHOOK_URL"
+
+  verify-health-staging:
+    name: Post-deploy health (staging)
+    needs: deploy-staging
+    if: needs.deploy-staging.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Wait before first health check
+        run: sleep 120
+
+      - name: Check /health (within 5 minutes)
+        id: health
+        env:
+          HEALTH_URL: ${{ secrets.HEALTH_CHECK_URL_STAGING }}
+        run: |
+          if [ -z "${HEALTH_URL:-}" ]; then
+            echo "HEALTH_CHECK_URL_STAGING not set — skipping automated health gate"
+            exit 0
+          fi
+          end=$((SECONDS + 300))
+          while [ "$SECONDS" -lt "$end" ]; do
+            if curl -fsS --max-time 30 "${HEALTH_URL}/health"; then
+              echo "Health OK"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "Health check failed within 5 minutes"
+          exit 1
+
+      - name: Trigger automated rollback
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PREV="$(git rev-parse HEAD^)"
+          gh workflow run rollback.yml \
+            --repo "${{ github.repository }}" \
+            -f environment=staging \
+            -f "target_revision=$PREV"
+
+  deploy-prod:
+    name: Deploy to prod
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'prod'
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Deployment summary
+        run: |
+          echo "SHA=${{ github.sha }}"
+          echo "Manual promotion to prod (requires 2 approvals from prod-team via Environment protection)"
+
+      - name: Build & deploy (integrate ECR + Argo / kubectl)
+        run: |
+          echo "Replace this step with: promote validated image to prod overlay / Argo sync prod Application."
+
+      - name: Record deployment history (Redis)
+        if: success()
+        env:
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_WORKFLOW: ${{ github.workflow }}
+        run: bash scripts/record-deploy-redis.sh prod
+
+      - name: Slack — deployment status
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then echo "SLACK_WEBHOOK_URL not set; skipping Slack"; exit 0; fi
+          STATUS="${{ job.status }}"
+          COLOR="$([ "$STATUS" == 'success' ] && echo 'good' || echo 'danger')"
+          curl -sS -X POST -H 'Content-type: application/json' \
+            --data "{\"attachments\":[{\"color\":\"${COLOR}\",\"text\":\"*Deploy prod* ${STATUS}\",\"fields\":[{\"title\":\"SHA\",\"value\":\"${{ github.sha }}\",\"short\":true},{\"title\":\"Run\",\"value\":\"<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>\"}]}]}" \
+            "$SLACK_WEBHOOK_URL"
+
+  verify-health-prod:
+    name: Post-deploy health (prod)
+    needs: deploy-prod
+    if: needs.deploy-prod.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Wait before first health check
+        run: sleep 120
+
+      - name: Check /health (within 5 minutes)
+        id: health
+        env:
+          HEALTH_URL: ${{ secrets.HEALTH_CHECK_URL_PROD }}
+        run: |
+          if [ -z "${HEALTH_URL:-}" ]; then
+            echo "HEALTH_CHECK_URL_PROD not set — skipping automated health gate"
+            exit 0
+          fi
+          end=$((SECONDS + 300))
+          while [ "$SECONDS" -lt "$end" ]; do
+            if curl -fsS --max-time 30 "${HEALTH_URL}/health"; then
+              echo "Health OK"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "Health check failed within 5 minutes"
+          exit 1
+
+      - name: Trigger automated rollback
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PREV="$(git rev-parse HEAD^)"
+          gh workflow run rollback.yml \
+            --repo "${{ github.repository }}" \
+            -f environment=prod \
+            -f "target_revision=$PREV"

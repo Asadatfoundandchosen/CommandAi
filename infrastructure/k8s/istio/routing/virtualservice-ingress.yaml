@@ -1,0 +1,29 @@
+# Routes external traffic from the mesh Gateway to in-mesh services.
+# Replace host with your public DNS name when using TLS on the Gateway.
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: public-api
+  namespace: istio-system
+spec:
+  hosts:
+    - "*"
+  gateways:
+    - public-gateway
+  http:
+    - match:
+        - uri:
+            prefix: /api
+      route:
+        - destination:
+            host: api.1commandai-apps.svc.cluster.local
+            port:
+              number: 3000
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: frontend.1commandai-apps.svc.cluster.local
+            port:
+              number: 80

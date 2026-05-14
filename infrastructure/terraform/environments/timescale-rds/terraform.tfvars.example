@@ -1,0 +1,13 @@
+# Copy to terraform.tfvars (do not commit secrets).
+
+aws_region = "us-east-1"
+project_name = "1commandai"
+
+vpc_id             = "vpc-xxxxxxxx"
+private_subnet_ids = ["subnet-aaaa", "subnet-bbbb"]
+# EKS cluster / node / API security group that must reach PostgreSQL on 5432
+allowed_security_group_ids = ["sg-xxxxxxxx"]
+
+# Dev-only destroy (never in prod)
+# skip_final_snapshot = true
+# deletion_protection = false

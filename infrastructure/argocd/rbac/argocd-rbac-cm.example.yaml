@@ -1,0 +1,15 @@
+# Merge into the live argocd-rbac-cm (do not replace unrelated keys).
+# Example: kubectl -n argocd get configmap argocd-rbac-cm -o yaml > /tmp/rbac.yaml
+#          # edit policy.csv, then kubectl apply -f /tmp/rbac.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-rbac-cm
+  namespace: argocd
+data:
+  policy.default: role:readonly
+  policy.csv: |
+    # Admins (OIDC group from GitHub org team — map claim in argocd-cm)
+    g, 1commandai-argocd-admins, role:admin
+    # AppProject-scoped roles (see infrastructure/argocd/projects/appproject.yaml)
+    p, role:readonly, applications, get, */*, allow

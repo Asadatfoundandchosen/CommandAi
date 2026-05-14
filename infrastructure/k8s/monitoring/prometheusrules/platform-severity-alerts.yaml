@@ -1,0 +1,137 @@
+# PrometheusRule for kube-prometheus-stack. Apply to the same namespace as Prometheus (e.g. monitoring).
+# Adjust label selectors (namespace, service) to match your cluster scrape labels.
+# Severity labels drive Alertmanager routing: p1 → PagerDuty, p2|p3 → Slack.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: platform-severity-alerts
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: 1commandai
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: 1commandai.platform.p1
+      interval: 30s
+      rules:
+        - alert: PlatformAPIDown
+          expr: |
+            max by (namespace, service) (
+              up{service="platform-api"} == 0
+            )
+          for: 1m
+          labels:
+            severity: p1
+          annotations:
+            summary: "Platform API target is down (no scrape) for >1m"
+            description: "Prometheus cannot scrape platform-api in namespace {{ $labels.namespace }}. Check pods, Service, and NetworkPolicy."
+            runbook_url: "https://github.com/1commandai/platform/blob/main/docs/runbooks/api-down.md"
+
+        - alert: PlatformAPIHighErrorRate
+          expr: |
+            (
+              sum by (namespace) (
+                rate(http_request_duration_seconds_count{status_code=~"5..", service="platform-api"}[5m])
+              )
+              /
+              clamp_min(
+                sum by (namespace) (
+                  rate(http_request_duration_seconds_count{service="platform-api"}[5m])
+                ),
+                0.001
+              )
+            ) > 0.10
+            and on (namespace)
+            sum by (namespace) (
+              rate(http_request_duration_seconds_count{service="platform-api"}[5m])
+            ) > 0.05
+          for: 5m
+          labels:
+            severity: p1
+          annotations:
+            summary: "Platform API 5xx error rate >10% (with traffic)"
+            description: "More than 10% of sampled HTTP requests returned 5xx in namespace {{ $labels.namespace }}."
+            runbook_url: "https://github.com/1commandai/platform/blob/main/docs/runbooks/high-error-rate.md"
+
+    - name: 1commandai.platform.p2
+      interval: 30s
+      rules:
+        - alert: PlatformAPIHighLatencyP99
+          expr: |
+            histogram_quantile(
+              0.99,
+              sum by (le, namespace) (
+                rate(http_request_duration_seconds_bucket{service="platform-api"}[5m])
+              )
+            ) > 1
+          for: 10m
+          labels:
+            severity: p2
+          annotations:
+            summary: "Platform API HTTP latency p99 > 1s"
+            description: "p99 of http_request_duration_seconds for platform-api in {{ $labels.namespace }} exceeds 1s."
+            runbook_url: "https://github.com/1commandai/platform/blob/main/docs/runbooks/high-latency-p99.md"
+
+        - alert: BullMQQueueWaitingHigh
+          expr: sum(bullmq_queue_size{status="waiting"}) > 1000
+          for: 10m
+          labels:
+            severity: p2
+          annotations:
+            summary: "BullMQ waiting jobs > 1000 (aggregate)"
+            description: "Sum of bullmq_queue_size for status=waiting exceeds 1000. Tune threshold per environment; see Grafana dashboard 1cmd-queue-depth."
+            runbook_url: "https://github.com/1commandai/platform/blob/main/docs/runbooks/queue-depth-high.md"
+
+        - alert: PlatformAPIRateLimit429Sustained
+          expr: |
+            sum(rate(http_ratelimit_429_total[5m])) > 1
+          for: 5m
+          labels:
+            severity: p2
+          annotations:
+            summary: "Sustained HTTP 429 from API rate limiter (>1/s aggregate)"
+            description: "Sliding-window rate limit is returning 429s at a steady rate. Check abuse, RATE_LIMIT_* env, or legitimate traffic spikes. Grafana: dashboard 1cmd-rate-limits (uid 1cmd-rate-limits)."
+
+        - alert: QueueDepthHighRedisKeysProxy
+          expr: sum(redis_db_keys) > 1000
+          for: 15m
+          labels:
+            severity: p2
+          annotations:
+            summary: "Redis key count > 1000 (coarse proxy)"
+            description: "Sum of redis_db_keys across scraped Redis exporters exceeds 1000. Use BullMQQueueWaitingHigh + bullmq_queue_size when the API is scraped."
+            runbook_url: "https://github.com/1commandai/platform/blob/main/docs/runbooks/queue-depth-high.md"
+
+    - name: 1commandai.platform.p3
+      interval: 60s
+      rules:
+        - alert: NodeMemoryPressure
+          expr: |
+            (
+              (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)
+              / node_memory_MemTotal_bytes
+            ) * 100 > 80
+          for: 15m
+          labels:
+            severity: p3
+          annotations:
+            summary: "Node memory utilization >80%"
+            description: "Instance {{ $labels.instance }} is using more than 80% of RAM."
+            runbook_url: "https://github.com/1commandai/platform/blob/main/docs/runbooks/node-memory-high.md"
+
+        - alert: NodeDiskSpaceLow
+          expr: |
+            (
+              1
+              - (
+                node_filesystem_avail_bytes{fstype!="", mountpoint!="", mountpoint!~"/run.*"}
+                / node_filesystem_size_bytes{fstype!="", mountpoint!="", mountpoint!~"/run.*"}
+              )
+            ) * 100 > 70
+          for: 30m
+          labels:
+            severity: p3
+          annotations:
+            summary: "Node filesystem utilization >70%"
+            description: "Disk on {{ $labels.instance }} mount {{ $labels.mountpoint }} is over 70% full."
+            runbook_url: "https://github.com/1commandai/platform/blob/main/docs/runbooks/node-disk-high.md"

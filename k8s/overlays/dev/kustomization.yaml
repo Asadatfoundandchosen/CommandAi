@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: 1commandai-dev
+resources:
+  - namespace.yaml
+  - ../../base
+images:
+  - name: 1commandai/platform
+    newName: 000000000000.dkr.ecr.us-east-1.amazonaws.com/1commandai/platform
+    newTag: dev

@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: 1commandai-dev
+  labels:
+    app.kubernetes.io/part-of: 1commandai
+    environment: dev
+    istio-injection: enabled

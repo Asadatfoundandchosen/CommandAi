@@ -1,0 +1,61 @@
+{
+  "policy": {
+    "description": "1CommandAI: audit-* and search-* — hot (0–7d) → warm (force merge + optional shrink) → delete at 90d. Matches OpenSearch ISM (use on Amazon OpenSearch / OpenSearch 2.x).",
+    "default_state": "hot",
+    "ism_template": [
+      { "index_patterns": ["audit-*"], "priority": 200 },
+      { "index_patterns": ["search-*"], "priority": 199 }
+    ],
+    "states": [
+      {
+        "name": "hot",
+        "actions": [
+          {
+            "index_priority": { "priority": 100 }
+          }
+        ],
+        "transitions": [
+          {
+            "state_name": "warm",
+            "conditions": {
+              "min_index_age": "7d"
+            }
+          }
+        ]
+      },
+      {
+        "name": "warm",
+        "actions": [
+          {
+            "force_merge": {
+              "max_num_segments": 1
+            }
+          },
+          {
+            "shrink": {
+              "num_new_shards": 1,
+              "force_unsafe": false
+            }
+          }
+        ],
+        "transitions": [
+          {
+            "state_name": "delete",
+            "conditions": {
+              "min_index_age": "90d"
+            }
+          }
+        ]
+      },
+      {
+        "name": "delete",
+        "actions": [
+          {
+            "delete": {}
+          }
+        ],
+        "transitions": []
+      }
+    ]
+  }
+}

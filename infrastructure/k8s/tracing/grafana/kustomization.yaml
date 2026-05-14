@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: monitoring
+configMapGenerator:
+  - name: grafana-datasource-jaeger
+    options:
+      labels:
+        grafana_datasource: "1"
+        app.kubernetes.io/part-of: 1commandai
+    files:
+      - datasources/jaeger.yaml
+  - name: grafana-dashboards-jaeger
+    options:
+      labels:
+        grafana_dashboard: "1"
+        app.kubernetes.io/part-of: 1commandai
+    files:
+      - dashboards/trace-overview.json

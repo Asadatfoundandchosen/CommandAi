@@ -1,0 +1,19 @@
+# Routes HTTP to Kiali through the existing public ingress Gateway.
+# Prerequisite: kubectl apply -f <istio-release>/samples/addons/kiali.yaml
+# Set hosts to a DNS name that resolves to your istio-ingressgateway Service/LB, or use port-forward (README).
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: kiali-vs
+  namespace: istio-system
+spec:
+  hosts:
+    - "kiali.istio-system.example.com"
+  gateways:
+    - public-gateway
+  http:
+    - route:
+        - destination:
+            host: kiali
+            port:
+              number: 20001

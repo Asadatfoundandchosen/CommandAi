@@ -1,0 +1,47 @@
+# Recording rules for platform-api SLOs (targets: 99.9% success, 99% requests <200ms, <0.1% 5xx).
+# Requires scrape labels service="platform-api" (kube Service name). Uses [30d] windows — set Prometheus
+# retention ≥30d for full monthly error-budget math; with 15d retention, windows are capped to available data.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: slo-platform-api-recording
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: 1commandai
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: slo.recording.platform_api
+      interval: 60s
+      rules:
+        - record: slo:platform_api:request_success_ratio:30d
+          expr: |
+            1 - (
+              sum(rate(http_request_duration_seconds_count{status_code=~"5..", service="platform-api"}[30d]))
+              / clamp_min(sum(rate(http_request_duration_seconds_count{service="platform-api"}[30d])), 1e-12)
+            )
+
+        - record: slo:platform_api:error_ratio:30d
+          expr: |
+            sum(rate(http_request_duration_seconds_count{status_code=~"5..", service="platform-api"}[30d]))
+            / clamp_min(sum(rate(http_request_duration_seconds_count{service="platform-api"}[30d])), 1e-12)
+
+        - record: slo:platform_api:latency_under_200ms_ratio:30d
+          expr: |
+            sum(rate(http_request_duration_seconds_bucket{le="0.2", service="platform-api"}[30d]))
+            / clamp_min(sum(rate(http_request_duration_seconds_count{service="platform-api"}[30d])), 1e-12)
+
+        - record: slo:platform_api:availability_error_budget_consumed:30d
+          expr: |
+            (1 - slo:platform_api:request_success_ratio:30d) / 0.001
+
+        - record: slo:platform_api:latency_error_budget_consumed:30d
+          expr: |
+            (1 - slo:platform_api:latency_under_200ms_ratio:30d) / 0.01
+
+        - record: slo:platform_api:availability_burn_multiplier_1h
+          expr: |
+            (
+              sum(rate(http_request_duration_seconds_count{status_code=~"5..", service="platform-api"}[1h]))
+              / clamp_min(sum(rate(http_request_duration_seconds_count{service="platform-api"}[1h])), 1e-12)
+            ) / 0.001

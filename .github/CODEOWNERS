@@ -1,0 +1,31 @@
+# 1CommandAI — code ownership for required reviews
+# Repository: github.com/1commandai/platform
+#
+# Replace @1commandai/* placeholders with real GitHub @username or @org/team handles.
+# GitHub uses the *last* pattern that matches a path — put the broadest rule last.
+#
+# Docs: docs/BRANCH_PROTECTION.md
+
+# Application source
+/src/ @1commandai/backend
+
+# Terraform reusable modules (per module)
+/infrastructure/terraform/modules/vpc/ @1commandai/platform-engineering
+/infrastructure/terraform/modules/security-groups/ @1commandai/platform-engineering
+/infrastructure/terraform/modules/eks/ @1commandai/platform-engineering
+/infrastructure/terraform/modules/ecr/ @1commandai/platform-engineering
+
+# Terraform environments and bootstrap
+/infrastructure/terraform/environments/ @1commandai/platform-engineering
+/infrastructure/terraform/bootstrap/ @1commandai/platform-engineering
+
+# Kubernetes manifests (Istio, etc.)
+/infrastructure/k8s/ @1commandai/platform-engineering
+
+# Docs and repo governance
+/docs/ @1commandai/documentation
+/.github/ @1commandai/maintainers
+/.cursor/ @1commandai/maintainers
+
+# Default owners for paths not listed above
+* @1commandai/maintainers

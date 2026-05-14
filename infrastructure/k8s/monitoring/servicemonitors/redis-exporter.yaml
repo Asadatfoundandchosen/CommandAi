@@ -1,0 +1,17 @@
+# Targets prometheus-community/prometheus-redis-exporter Service (release label may differ).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: redis-exporter
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis-exporter
+  endpoints:
+    # prometheus-redis-exporter chart often names the Service port `metrics`.
+    - port: metrics
+      interval: 15s
+      scrapeTimeout: 10s

@@ -1,0 +1,42 @@
+# AppProject: repo + cluster destinations + coarse RBAC roles (bind OIDC groups after SSO).
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: "1commandai"
+  namespace: argocd
+spec:
+  description: 1CommandAI platform (dev / staging / prod)
+  sourceRepos:
+    - "https://github.com/1commandai/platform.git"
+  destinations:
+    - namespace: "1commandai-dev"
+      server: https://kubernetes.default.svc
+    - namespace: "1commandai-staging"
+      server: https://kubernetes.default.svc
+    - namespace: "1commandai-prod"
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+  roles:
+    - name: dev-sync
+      description: Sync only the dev API application
+      policies:
+        - p, proj:1commandai:dev-sync, applications, get, 1commandai/*, allow
+        - p, proj:1commandai:dev-sync, applications, sync, 1commandai/platform-api-dev, allow
+      groups:
+        - 1commandai-argocd-dev
+    - name: staging-sync
+      description: Sync only staging (manual promotion from dev)
+      policies:
+        - p, proj:1commandai:staging-sync, applications, get, 1commandai/*, allow
+        - p, proj:1commandai:staging-sync, applications, sync, 1commandai/platform-api-staging, allow
+      groups:
+        - 1commandai-argocd-staging
+    - name: prod-approver
+      description: Production sync (manual + restricted group = approval gate)
+      policies:
+        - p, proj:1commandai:prod-approver, applications, get, 1commandai/*, allow
+        - p, proj:1commandai:prod-approver, applications, sync, 1commandai/platform-api-prod, allow
+      groups:
+        - 1commandai-argocd-prod

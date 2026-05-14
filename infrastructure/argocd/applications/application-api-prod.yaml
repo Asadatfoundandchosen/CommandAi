@@ -1,0 +1,22 @@
+# Production: no automated sync — operator syncs in Argo CD UI/CLI after review.
+# "Approval" is enforced by GitHub (PR + environment) and by AppProject role prod-approver (OIDC group).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-api-prod
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: 1commandai
+    environment: prod
+spec:
+  project: "1commandai"
+  source:
+    repoURL: https://github.com/1commandai/platform.git
+    targetRevision: main
+    path: k8s/overlays/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: "1commandai-prod"
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true

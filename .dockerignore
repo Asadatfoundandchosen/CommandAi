@@ -1,0 +1,19 @@
+# Keep build context small and avoid leaking secrets into images.
+node_modules
+dist
+coverage
+.git
+.github
+.cursor
+**/.terraform
+*.md
+!README.md
+tests
+playwright-report
+test-results
+.env
+.env.*
+!.env.example
+*.log
+.vscode
+.idea

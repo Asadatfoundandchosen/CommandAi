@@ -1,0 +1,19 @@
+# REQUIRED: merge with `helm show values jaegertracing/jaeger` for your chart version — keys differ between releases.
+# Goals: Jaeger **Agent** (DaemonSet), **Collector** (OTLP gRPC/HTTP), **Query** UI; **Elasticsearch** as span store; **7d** retention via ES ILM on Jaeger indices.
+
+agent:
+  enabled: true
+
+collector:
+  enabled: true
+
+query:
+  enabled: true
+
+storage:
+  type: elasticsearch
+  elasticsearch:
+    serverUrls: http://elasticsearch:9200
+    indexPrefix: jaeger
+    username: ""
+    password: ""

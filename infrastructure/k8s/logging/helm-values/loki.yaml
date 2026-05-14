@@ -1,0 +1,33 @@
+# grafana/loki — SingleBinary + S3 (IRSA). Align chart version with: helm show values grafana/loki
+# https://grafana.com/docs/loki/latest/setup/install/helm/
+deploymentMode: SingleBinary
+
+singleBinary:
+  replicas: 1
+  persistence:
+    enabled: true
+    size: 20Gi
+
+loki:
+  commonConfig:
+    replication_factor: 1
+  limits_config:
+    retention_period: 30d
+  storage:
+    type: s3
+    bucketNames:
+      chunks: REPLACE_LOKI_CHUNKS_BUCKET
+      ruler: REPLACE_LOKI_RULER_BUCKET
+    s3:
+      region: us-east-1
+      endpoint: null
+      secretAccessKey: null
+      accessKeyId: null
+      signatureVersion: null
+      s3ForcePathStyle: false
+      insecure: false
+
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::000000000000:role/loki-s3-access

@@ -1,0 +1,13 @@
+# Copy to `terraform.tfvars` (not committed with secrets).
+# Bucket names must be **globally** unique; adjust if taken.
+
+environment   = "dev"
+aws_region    = "us-east-1"
+dr_aws_region = "us-west-2"
+enable_crr    = true
+
+tags = {
+  Project     = "1commandai"
+  Application = "files"
+  Environment = "dev"
+}

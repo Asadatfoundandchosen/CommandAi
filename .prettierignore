@@ -1,0 +1,8 @@
+node_modules
+dist
+coverage
+.terraform
+**/.terraform
+package-lock.json
+backend/openapi.json
+backend/src/types/openapi.generated.ts

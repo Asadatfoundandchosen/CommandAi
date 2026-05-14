@@ -1,0 +1,8 @@
+# Application workloads: enable sidecar injection for mTLS and telemetry.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: 1commandai-apps
+  labels:
+    istio-injection: enabled
+    app.kubernetes.io/part-of: 1commandai

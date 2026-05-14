@@ -1,0 +1,51 @@
+{
+  "name": "1commandai-platform",
+  "private": true,
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/auto-instrumentations-node": "^0.52.1",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.57.2",
+    "@opentelemetry/resources": "^1.30.1",
+    "@opentelemetry/sdk-node": "^0.57.2",
+    "@opentelemetry/sdk-trace-base": "^1.30.1",
+    "@opentelemetry/semantic-conventions": "^1.40.0",
+    "dd-trace": "^5.97.0",
+    "express": "^4.21.0",
+    "pino": "^9.6.0",
+    "pino-http": "^10.3.0",
+    "prom-client": "^15.1.3"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "format:check": "prettier --check \"backend/package.json\" \"backend/tsconfig.json\" \"backend/README.md\" \"backend/src/**/*.ts\" \"docs/ARCHITECTURE.md\" \"src/datadog.ts\" \"src/instrumentation.ts\" \"src/telemetry.ts\" \"src/main.ts\" \"src/__ci__/**/*.ts\" \"src/lib/**/*.ts\" \"tests/**/*.ts\" \"playwright.config.ts\" \".github/workflows/*.yml\" \"docs/DEPLOYMENT.md\" \"docs/runbooks/**/*.md\" \"infrastructure/k8s/monitoring/**/*.{md,yml,yaml,json}\" \"infrastructure/k8s/logging/**/*.{md,yml,yaml,json}\" \"infrastructure/k8s/tracing/**/*.{md,yml,yaml,json}\" \"infrastructure/k8s/apm/**/*.{md,yml,yaml,json}\" \"package.json\" \"tsconfig.json\" \"tsconfig.build.json\" \"eslint.config.mjs\"",
+    "test": "npm run test:coverage",
+    "test:unit": "jest --testMatch \"**/src/**/*.unit.test.ts\"",
+    "test:integration": "cross-env JEST_INTEGRATION=1 jest --testMatch \"**/tests/**/*.integration.test.ts\" --runInBand",
+    "test:coverage": "jest --coverage --runInBand",
+    "test:e2e": "playwright test",
+    "build": "tsc -p tsconfig.build.json",
+    "backend:dev": "npm run dev --prefix backend",
+    "backend:build": "npm run build --prefix backend",
+    "audit": "npm audit --audit-level=moderate"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.15.0",
+    "@playwright/test": "^1.49.0",
+    "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.9.0",
+    "@types/supertest": "^6.0.2",
+    "cross-env": "^7.0.3",
+    "eslint": "^9.15.0",
+    "jest": "^29.7.0",
+    "mongodb": "^6.10.0",
+    "prettier": "^3.3.3",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.15.0"
+  }
+}

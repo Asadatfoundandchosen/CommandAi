@@ -1,0 +1,96 @@
+# SLO error-budget alerts (50% / 75% / 100% consumed). Pair with Alertmanager routes + runbooks.
+# Availability / 5xx target: 99.9% (max bad 0.1% — same numeric target as “error rate < 0.1%” for HTTP 5xx).
+# Latency target: ≥99% of requests ≤200ms (max slow 1%).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: slo-platform-api-budget-alerts
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: 1commandai
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: slo.budget.availability
+      interval: 60s
+      rules:
+        - alert: SLOAvailabilityBudget50PercentConsumed
+          expr: |
+            slo:platform_api:availability_error_budget_consumed:30d >= 0.5
+            and
+            slo:platform_api:availability_error_budget_consumed:30d < 0.75
+          for: 10m
+          labels:
+            severity: p3
+            slo: availability
+          annotations:
+            summary: "SLO: ≥50% of monthly availability error budget consumed (target 99.9%)"
+            description: "30d rolling; budget = (1-success)/0.001. See Grafana SLO dashboard."
+            runbook_url: "https://github.com/1commandai/platform/blob/main/docs/runbooks/slo-error-budget.md"
+
+        - alert: SLOAvailabilityBudget75PercentConsumed
+          expr: |
+            slo:platform_api:availability_error_budget_consumed:30d >= 0.75
+            and
+            slo:platform_api:availability_error_budget_consumed:30d < 1
+          for: 10m
+          labels:
+            severity: p2
+            slo: availability
+          annotations:
+            summary: "SLO: ≥75% of monthly availability error budget consumed (target 99.9%)"
+            description: "30d rolling error budget for non-5xx success ratio."
+            runbook_url: "https://github.com/1commandai/platform/blob/main/docs/runbooks/slo-error-budget.md"
+
+        - alert: SLOAvailabilityBudgetExhausted
+          expr: slo:platform_api:availability_error_budget_consumed:30d >= 1
+          for: 5m
+          labels:
+            severity: p1
+            slo: availability
+          annotations:
+            summary: "SLO: availability error budget exhausted (≤99.9% success over 30d window)"
+            description: "Rolling 30d bad/total exceeds allowed 0.1%."
+            runbook_url: "https://github.com/1commandai/platform/blob/main/docs/runbooks/slo-error-budget.md"
+
+    - name: slo.budget.latency
+      interval: 60s
+      rules:
+        - alert: SLOLatencyBudget50PercentConsumed
+          expr: |
+            slo:platform_api:latency_error_budget_consumed:30d >= 0.5
+            and
+            slo:platform_api:latency_error_budget_consumed:30d < 0.75
+          for: 10m
+          labels:
+            severity: p3
+            slo: latency
+          annotations:
+            summary: "SLO: ≥50% of latency error budget consumed (99% <200ms)"
+            description: "Share of requests over 200ms vs allowed 1%."
+            runbook_url: "https://github.com/1commandai/platform/blob/main/docs/runbooks/slo-error-budget.md"
+
+        - alert: SLOLatencyBudget75PercentConsumed
+          expr: |
+            slo:platform_api:latency_error_budget_consumed:30d >= 0.75
+            and
+            slo:platform_api:latency_error_budget_consumed:30d < 1
+          for: 10m
+          labels:
+            severity: p2
+            slo: latency
+          annotations:
+            summary: "SLO: ≥75% of latency error budget consumed (99% <200ms)"
+            description: "Histogram le=0.2s vs total requests, 30d window."
+            runbook_url: "https://github.com/1commandai/platform/blob/main/docs/runbooks/slo-error-budget.md"
+
+        - alert: SLOLatencyBudgetExhausted
+          expr: slo:platform_api:latency_error_budget_consumed:30d >= 1
+          for: 5m
+          labels:
+            severity: p1
+            slo: latency
+          annotations:
+            summary: "SLO: latency error budget exhausted (under 99% within 200ms)"
+            description: "More than 1% of requests exceeded 200ms over 30d (rolling)."
+            runbook_url: "https://github.com/1commandai/platform/blob/main/docs/runbooks/slo-error-budget.md"
