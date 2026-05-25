@@ -2,6 +2,7 @@ import type { Connection, ConnectOptions } from "mongoose";
 import mongoose from "mongoose";
 
 import { config } from "@config/index.js";
+import { mongooseTlsOptions } from "@config/tls-policy.js";
 
 /** Bounded staleness for secondary reads; Atlas + driver enforce routing to secondaries that stay within this lag window. */
 export const ANALYTICS_MAX_STALENESS_SECONDS = 90;
@@ -16,7 +17,9 @@ let analyticsConnection: Connection | null = null;
  */
 export function getAnalyticsMongooseConnectOptions(): ConnectOptions {
   const a = config.mongodb.analytics;
+  const uri = a?.uri ?? "";
   return {
+    ...mongooseTlsOptions(config.env, uri),
     readPreference: "secondaryPreferred" as const,
     maxStalenessSeconds: a?.maxStalenessSeconds ?? ANALYTICS_MAX_STALENESS_SECONDS,
     retryWrites: false,

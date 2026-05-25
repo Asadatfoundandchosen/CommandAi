@@ -1,4 +1,11 @@
+import Joi from "joi";
 import { z } from "zod";
+
+import {
+  objectId24 as objectId24Joi,
+  userRole,
+  userStatus,
+} from "@common/validation/joi-common.js";
 
 const objectId24 = z
   .string()
@@ -44,3 +51,29 @@ export const updateUserBodySchema = createUserBodySchema
   });
 
 export type UpdateUserBody = z.infer<typeof updateUserBodySchema>;
+
+/** Joi — `POST /api/users` (middleware). */
+export const createUserSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string().min(8).max(128).required(),
+  first_name: Joi.string().min(1).max(100).required(),
+  last_name: Joi.string().min(1).max(100).required(),
+  role: userRole.required(),
+  status: userStatus.optional(),
+  mfa_enabled: Joi.boolean().optional(),
+});
+
+/** Joi — `PATCH /api/users/:id`. */
+export const updateUserSchema = Joi.object({
+  email: Joi.string().email().optional(),
+  password: Joi.string().min(8).max(128).optional(),
+  first_name: Joi.string().min(1).max(100).optional(),
+  last_name: Joi.string().min(1).max(100).optional(),
+  role: userRole.optional(),
+  status: userStatus.optional(),
+  mfa_enabled: Joi.boolean().optional(),
+}).min(1);
+
+export const userIdParamJoiSchema = Joi.object({
+  id: objectId24Joi.required(),
+});

@@ -99,7 +99,7 @@ resource "aws_db_instance" "this" {
   max_allocated_storage = min(var.allocated_storage_gb * 2, 1000)
   storage_type          = "gp3"
   storage_encrypted     = var.storage_encrypted
-  kms_key_id            = var.kms_key_id
+  kms_key_id            = local.rds_kms_key_id
 
   multi_az               = var.multi_az
   db_subnet_group_name   = aws_db_subnet_group.this.name

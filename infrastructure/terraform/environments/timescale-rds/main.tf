@@ -14,6 +14,7 @@ module "timescale_rds" {
   instance_class               = "db.r6g.large"
   multi_az                     = true
   storage_encrypted            = true
+  create_dedicated_kms_key     = true
   timescaledb_shared_preload   = true
 
   tags = {

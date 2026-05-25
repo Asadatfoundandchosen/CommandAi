@@ -2,9 +2,15 @@ import { inject, injectable } from "inversify";
 import mongoose from "mongoose";
 
 import { HierarchyValidator } from "../../common/validators/hierarchy.validator.js";
+import {
+  PlanLimitExceededError,
+  PlanLimitsValidator,
+} from "../../common/validators/plan-limits.validator.js";
 import { TYPES } from "../../types.js";
+import { AuthService } from "../auth/auth.service.js";
+import { PasswordService } from "../auth/password.service.js";
+import { PermissionCacheService } from "../rbac/permission-cache.service.js";
 import { SearchService } from "../search/search.service.js";
-import { hashPassword } from "./user.password.js";
 import type { IUserPublic } from "./user.model.js";
 import { UserRepository, type CreateUserDoc } from "./user.repository.js";
 
@@ -34,7 +40,21 @@ export class UserService {
     @inject(TYPES.UserRepository) private readonly users: UserRepository,
     @inject(TYPES.HierarchyValidator) private readonly hierarchy: HierarchyValidator,
     @inject(TYPES.SearchService) private readonly search: SearchService,
+    @inject(TYPES.PlanLimitsValidator)
+    private readonly planLimits: PlanLimitsValidator,
+    @inject(TYPES.AuthService) private readonly auth: AuthService,
+    @inject(TYPES.PasswordService) private readonly passwords: PasswordService,
+    @inject(PermissionCacheService)
+    private readonly permissionCache: PermissionCacheService,
   ) {}
+
+  private passwordUserInputs(
+    email: string,
+    firstName: string,
+    lastName: string,
+  ): string[] {
+    return [email, firstName, lastName, email.split("@")[0] ?? ""];
+  }
 
   async create(
     orgId: string,
@@ -44,18 +64,27 @@ export class UserService {
     input: CreateUserInput,
   ): Promise<IUserPublic> {
     await this.hierarchy.assertUserHierarchy(orgId, accountId, departmentId);
+    await this.planLimits.assertCanCreateUser(orgId);
     const email = input.email.trim().toLowerCase();
+    const firstName = input.first_name.trim();
+    const lastName = input.last_name.trim();
+    this.passwords.assertPasswordStrength(
+      input.password,
+      this.passwordUserInputs(email, firstName, lastName),
+    );
+    const password_hash = await this.passwords.hashPassword(input.password);
     const doc: CreateUserDoc = {
       org_id: new mongoose.Types.ObjectId(orgId),
       account_id: new mongoose.Types.ObjectId(accountId),
       department_id: new mongoose.Types.ObjectId(departmentId),
       email,
-      password_hash: hashPassword(input.password),
-      first_name: input.first_name.trim(),
-      last_name: input.last_name.trim(),
+      password_hash,
+      first_name: firstName,
+      last_name: lastName,
       role: input.role,
       status: input.status ?? "pending",
       mfa_enabled: input.mfa_enabled ?? false,
+      password_change_required: false,
       last_login: null,
       created_by: new mongoose.Types.ObjectId(actorUserId),
       updated_by: new mongoose.Types.ObjectId(actorUserId),
@@ -110,7 +139,16 @@ export class UserService {
       setDoc.email = input.email.trim().toLowerCase();
     }
     if (input.password !== undefined) {
-      setDoc.password_hash = hashPassword(input.password);
+      const emailForCheck =
+        (input.email ?? existing.email).trim().toLowerCase();
+      const firstForCheck = (input.first_name ?? existing.first_name).trim();
+      const lastForCheck = (input.last_name ?? existing.last_name).trim();
+      this.passwords.assertPasswordStrength(
+        input.password,
+        this.passwordUserInputs(emailForCheck, firstForCheck, lastForCheck),
+      );
+      setDoc.password_hash = await this.passwords.hashPassword(input.password);
+      setDoc.password_change_required = false;
     }
     if (input.first_name !== undefined) {
       setDoc.first_name = input.first_name.trim();
@@ -131,6 +169,14 @@ export class UserService {
       $set: setDoc,
     });
     if (next) {
+      if (input.role !== undefined && input.role !== existing.role) {
+        await this.permissionCache.invalidate(id).catch(() => undefined);
+      }
+      if (input.password !== undefined) {
+        await this.auth
+          .revokeAllUserTokensOnPasswordChange(id)
+          .catch(() => undefined);
+      }
       await this.syncSearch(next).catch(() => undefined);
     }
     return next;
@@ -168,3 +214,4 @@ export {
   AccountNotInOrganizationError,
   DepartmentNotInAccountError,
 } from "../../common/validators/hierarchy.validator.js";
+export { PlanLimitExceededError } from "../../common/validators/plan-limits.validator.js";

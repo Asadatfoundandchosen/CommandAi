@@ -1,4 +1,4 @@
-import type { RequestHandler } from "express";
+import type { Request, RequestHandler } from "express";
 
 import { config } from "@config/index.js";
 
@@ -51,22 +51,32 @@ export type HierarchyRouteMinimum = "org_admin" | "account_admin" | "dept_manage
  * - Departments: **account_admin** (org_admin also allowed)
  * - Users: **dept_manager** (higher roles also allowed)
  */
+function resolveCallerRole(req: Request): HierarchyApiRole | "" {
+  const jwtRole =
+    typeof req.user?.role === "string" ? (req.user.role.trim() as HierarchyApiRole) : "";
+  if (jwtRole && jwtRole in ROLE_RANK) {
+    return jwtRole;
+  }
+  const raw = req.headers["x-user-role"];
+  const headerRole =
+    typeof raw === "string"
+      ? (raw.trim() as HierarchyApiRole)
+      : Array.isArray(raw)
+        ? (raw[0]?.trim() as HierarchyApiRole)
+        : "";
+  return headerRole && headerRole in ROLE_RANK ? headerRole : "";
+}
+
 export function requireMinimumHierarchyRole(
   minimum: HierarchyRouteMinimum,
 ): RequestHandler {
   const minRank = ROLE_RANK[minimum];
   return (req, res, next) => {
-    const raw = req.headers["x-user-role"];
-    const role =
-      typeof raw === "string"
-        ? (raw.trim() as HierarchyApiRole)
-        : Array.isArray(raw)
-          ? (raw[0]?.trim() as HierarchyApiRole)
-          : "";
-    if (!role || !(role in ROLE_RANK)) {
+    const role = resolveCallerRole(req);
+    if (!role) {
       res.status(401).json({
         error:
-          "X-User-Role header required: org_admin | account_admin | dept_manager | dept_user",
+          "JWT role claim or X-User-Role header required: org_admin | account_admin | dept_manager | dept_user",
       });
       return;
     }

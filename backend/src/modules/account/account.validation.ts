@@ -21,6 +21,7 @@ const budgetSchema = z.object({
   credit_limit: z.number(),
   allocated_credits: z.number(),
   used_credits: z.number(),
+  warning_threshold: z.number().int().min(1).max(100).optional(),
 });
 
 export const createAccountBodySchema = z.object({
@@ -35,3 +36,29 @@ export type CreateAccountBody = z.infer<typeof createAccountBodySchema>;
 export const updateAccountBodySchema = createAccountBodySchema.partial();
 
 export type UpdateAccountBody = z.infer<typeof updateAccountBodySchema>;
+
+/** Body for `POST /api/v1/accounts/:id/allocate` — move credits from org pool to account. */
+export const allocateCreditsBodySchema = z.object({
+  amount: z.number().int().positive().max(1_000_000_000),
+  description: z.string().min(1).max(512).optional(),
+});
+
+export type AllocateCreditsBody = z.infer<typeof allocateCreditsBodySchema>;
+
+/** Body for `POST /api/v1/accounts/:id/budget/allocate`. */
+export const allocateBudgetBodySchema = allocateCreditsBodySchema;
+export type AllocateBudgetBody = z.infer<typeof allocateBudgetBodySchema>;
+
+/** Body for `PATCH /api/v1/accounts/:id/budget/limit`. */
+export const patchAccountBudgetLimitBodySchema = z
+  .object({
+    limit: z.number().int().min(0).max(1_000_000_000).optional(),
+    warning_threshold: z.number().int().min(1).max(100).optional(),
+  })
+  .refine((v) => v.limit !== undefined || v.warning_threshold !== undefined, {
+    message: "At least one of limit or warning_threshold is required",
+  });
+
+export type PatchAccountBudgetLimitBody = z.infer<
+  typeof patchAccountBudgetLimitBodySchema
+>;

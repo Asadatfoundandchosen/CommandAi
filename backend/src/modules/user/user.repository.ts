@@ -77,6 +77,13 @@ export class UserRepository {
    * Active users per department id (for tenant hierarchy dashboard).
    * Keys are 24-char hex department ObjectIds.
    */
+  async countActiveForOrg(orgId: string): Promise<number> {
+    return UserModel.countDocuments({
+      org_id: orgId,
+      is_deleted: false,
+    });
+  }
+
   async countActiveUsersByDepartmentForOrg(orgId: string): Promise<Map<string, number>> {
     const oid = new mongoose.Types.ObjectId(orgId);
     const rows = await UserModel.aggregate<{ _id: mongoose.Types.ObjectId; count: number }>([

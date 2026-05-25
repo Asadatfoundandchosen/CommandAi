@@ -1,0 +1,57 @@
+# Scheduled key rotation reminders and optional Vault transit rotate (manual approval).
+name: Key rotation
+
+on:
+  schedule:
+    # Quarterly reminder — 1st of Jan/Apr/Jul/Oct 09:00 UTC
+    - cron: "0 9 1 1,4,7,10 *"
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action to run"
+        required: true
+        default: "reminder"
+        type: choice
+        options:
+          - reminder
+          - vault-transit-rotate
+      environment:
+        description: "Environment"
+        required: true
+        default: "prod"
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+jobs:
+  reminder:
+    if: github.event_name == 'schedule' || inputs.action == 'reminder'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Rotation checklist
+        run: |
+          echo "## Key rotation checklist (${{ inputs.environment || 'all' }})"
+          echo "1. AWS KMS CMK — verify enable_key_rotation (annual, automatic)"
+          echo "2. Vault transit — scripts/vault/rotate-transit-key.sh"
+          echo "3. FIELD_ENCRYPTION_KEY — scripts/vault/rotate-field-encryption-key.sh + MongoDB re-encrypt"
+          echo "4. Review CloudTrail kms events + Vault audit log"
+          echo "See docs/runbooks/key-management.md"
+
+  vault-transit-rotate:
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'vault-transit-rotate'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Vault CLI
+        run: |
+          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
+          sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+          sudo apt-get update && sudo apt-get install -y vault
+      - name: Rotate transit key
+        env:
+          VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
+          VAULT_TOKEN: ${{ secrets.VAULT_ROTATION_TOKEN }}
+        run: bash scripts/vault/rotate-transit-key.sh app-field-encryption

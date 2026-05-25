@@ -1,0 +1,27 @@
+# AWS Load Balancer Controller — TLS 1.3, ACM cert, HTTPS redirect.
+# Set `alb.ingress.kubernetes.io/certificate-arn` per environment (from Terraform `alb-api-https` output).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: platform-api
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443},{"HTTP":80}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+    # alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:ACCOUNT:certificate/UUID
+    alb.ingress.kubernetes.io/healthcheck-path: /health/live
+spec:
+  rules:
+    - host: api.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: platform-api
+                port:
+                  number: 3000

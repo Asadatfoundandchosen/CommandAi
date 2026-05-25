@@ -13,7 +13,7 @@
   - **Engine**: `postgres` **15.x** (`engine_version` variable, default `15.8`).
   - **Instance**: default **`db.r6g.large`** (override via `instance_class`).
   - **Multi-AZ**: `multi_az = true` (default).
-  - **Encryption**: `storage_encrypted = true` (optional CMK via `kms_key_id`).
+  - **Encryption**: `storage_encrypted = true`; dedicated **CMK** when `create_dedicated_kms_key = true` (default in `environments/timescale-rds`). See **`docs/runbooks/encryption-at-rest.md`**.
   - **Timescale preload**: custom **`aws_db_parameter_group`** with `shared_preload_libraries = timescaledb` (`apply_method = pending-reboot`). Set `timescaledb_shared_preload = false` if your region/engine rejects it.
 - Example root module: **`infrastructure/terraform/environments/timescale-rds/`** — copy **`terraform.tfvars.example`** → **`terraform.tfvars`**, then `terraform init && terraform apply`.
 

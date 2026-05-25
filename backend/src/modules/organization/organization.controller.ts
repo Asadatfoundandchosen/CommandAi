@@ -3,11 +3,13 @@ import type { Request, Response } from "express";
 import { MongoServerError } from "mongodb";
 
 import { TYPES } from "../../types.js";
+import { CreditRatesService } from "../credits/credit-rates.service.js";
 import { InvalidStatusTransitionError } from "./organization.status-rules.js";
 import { OrganizationService } from "./organization.service.js";
 import {
   createOrganizationBodySchema,
   organizationIdParamSchema,
+  setOrgCreditRatesBodySchema,
   updateOrganizationBodySchema,
 } from "./organization.validation.js";
 
@@ -20,6 +22,8 @@ export class OrganizationController {
   constructor(
     @inject(TYPES.OrganizationService)
     private readonly organizations: OrganizationService,
+    @inject(TYPES.CreditRatesService)
+    private readonly creditRates: CreditRatesService,
   ) {}
 
   create = async (req: Request, res: Response): Promise<void> => {
@@ -106,6 +110,38 @@ export class OrganizationController {
       return;
     }
     res.status(204).send();
+  };
+
+  /** `PUT /api/organizations/:id/credit-rates` — platform admin enterprise custom rates. */
+  setCreditRates = async (req: Request, res: Response): Promise<void> => {
+    const p = organizationIdParamSchema.safeParse(req.params);
+    if (!p.success) {
+      res.status(400).json({ error: p.error.flatten() });
+      return;
+    }
+    const body = setOrgCreditRatesBodySchema.safeParse(req.body);
+    if (!body.success) {
+      res.status(400).json({ error: body.error.flatten() });
+      return;
+    }
+    try {
+      const data = await this.creditRates.setCustomRatesForOrg(p.data.id, body.data);
+      res.status(200).json({ data });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to set credit rates";
+      res.status(400).json({ error: message });
+    }
+  };
+
+  /** `DELETE /api/organizations/:id/credit-rates` — revert org to platform default rates. */
+  clearCreditRates = async (req: Request, res: Response): Promise<void> => {
+    const p = organizationIdParamSchema.safeParse(req.params);
+    if (!p.success) {
+      res.status(400).json({ error: p.error.flatten() });
+      return;
+    }
+    const data = await this.creditRates.clearCustomRatesForOrg(p.data.id);
+    res.status(200).json({ data });
   };
 
   /** JWT tenant scope — full Org → Account → Department tree with counts (see `GET /api/v1/organization/hierarchy`). */

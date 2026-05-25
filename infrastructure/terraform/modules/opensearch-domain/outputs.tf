@@ -20,3 +20,13 @@ output "master_user_password" {
   sensitive   = true
   description = "Built-in master password when `enable_internal_user_database` is true — store in Vault and rotate."
 }
+
+output "encrypt_at_rest_enabled" {
+  value       = var.encrypt_at_rest_enabled
+  description = "Whether domain encryption at rest is enabled."
+}
+
+output "kms_key_arn" {
+  value       = var.create_dedicated_kms_key && var.encrypt_at_rest_enabled ? aws_kms_key.opensearch[0].arn : var.kms_key_id
+  description = "KMS CMK ARN for OpenSearch encryption at rest."
+}

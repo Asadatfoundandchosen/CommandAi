@@ -25,3 +25,13 @@ output "readonly_user_password" {
   value     = module.atlas.readonly_user_password
   sensitive = true
 }
+
+output "atlas_encryption_at_rest_enabled" {
+  value       = module.atlas.encryption_at_rest_enabled
+  description = "Atlas BYOK (AWS KMS) encryption at rest."
+}
+
+output "atlas_kms_key_arn" {
+  value       = module.atlas.atlas_kms_key_arn
+  description = "Per-project CMK for MongoDB Atlas encryption at rest."
+}

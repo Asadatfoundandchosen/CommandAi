@@ -49,3 +49,17 @@ output "readonly_user_password" {
   sensitive = true
 }
 
+output "encryption_at_rest_enabled" {
+  value       = var.encryption_at_rest_enabled
+  description = "Whether Atlas BYOK (AWS KMS) encryption at rest is configured."
+}
+
+output "atlas_kms_key_arn" {
+  value       = var.encryption_at_rest_enabled ? local.atlas_kms_key_arn : null
+  description = "AWS KMS CMK used for Atlas encryption at rest (per project)."
+}
+
+output "atlas_kms_key_alias" {
+  value       = var.encryption_at_rest_enabled && var.create_atlas_kms_key ? aws_kms_alias.atlas[0].name : null
+  description = "KMS alias for the Atlas project CMK."
+}

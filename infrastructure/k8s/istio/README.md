@@ -103,7 +103,7 @@ Run these **after** `istioctl install`, mesh manifests, and workloads are up. Se
 | **mTLS enforced — plain client without mesh cert fails** | From a pod **without** a sidecar, call a meshed Service; expect failure or non-200 (e.g. TLS/connection error), while the same call from a **meshed** client succeeds. Example: apply `samples/curl-plainclient-pod.yaml` in `default`, then `kubectl exec curl-plainclient -- curl -sS -m 5 -v http://api.1commandai-apps.svc.cluster.local:3000/` (adjust host/port). | **`mesh/peerauthentication-strict-mtls.yaml`** + **`routing/destinationrules-services.yaml`**. Sample: **`samples/curl-plainclient-pod.yaml`**. |
 | **Kiali shows service graph** | Open Kiali → **Graph** → select namespace **`1commandai-apps`** → enable **Traffic** / **Security** (mTLS edges). Generate traffic between services if the graph is empty. | **Kiali** is upstream addon; **`addons/kiali-access.yaml`** wires ingress (optional). |
 | **Access logs in Elasticsearch** | Envoy logs are **JSON to stdout** (`istio-operator.yaml`). They reach Elasticsearch only via a **log shipper** (Fluent Bit, Filebeat, Elastic Agent, etc.) tailing **`istio-proxy`** container logs and indexing to ES. See **Elasticsearch** below. | **Configured:** stdout JSON. **Not included:** ES/Fluent Bit Helm charts (platform choice). |
-| **No plaintext between meshed services** | With **STRICT** + **`ISTIO_MUTUAL`**, data plane hop between sidecars uses mutual TLS. Verify with **`istioctl authn tls-check`**, Kiali **mTLS** edge badges, and (optionally) packet capture on the **tunnel** port (advanced). Edge ingress may still be HTTP until you add **Gateway TLS**. | **Mesh:** STRICT + DRs. **Ingress:** HTTP in `routing/gateway-public.yaml` until you add TLS — that is **north–south**; **east–west** between injected pods should not use cleartext on the mesh path. |
+| **No plaintext between meshed services** | With **STRICT** + **`ISTIO_MUTUAL`**, data plane hop between sidecars uses mutual TLS. Verify with **`istioctl authn tls-check`**, Kiali **mTLS** edge badges. | **Mesh:** STRICT + DRs. **North–south:** `routing/gateway-public-https.yaml` or **`k8s/base/ingress.yaml`** (ALB TLS 1.3). **East–west:** mTLS only on the mesh path. |
 
 ### `istioctl verify-install`
 
@@ -165,7 +165,7 @@ Validate in **Kibana Discover** (or Elastic Discover) with index pattern `istio-
 
 - **`istioctl authn tls-check <client-pod>.<ns> <server-svc>.<ns>.svc.cluster.local`** should report **mTLS** when both ends are injected.
 - **Kiali** security layer on the graph should show **mutual TLS** on edges between meshed workloads.
-- **Gateway** in `routing/gateway-public.yaml` is **HTTP** for ease of setup; add **TLS** (`credentialName` / SDS) for encrypted **ingress** — that is separate from east–west mTLS between sidecars.
+- **Gateway:** use `routing/gateway-public-https.yaml` for TLS 1.3 ingress, or **ALB** via `k8s/base/ingress.yaml` — separate from east–west **mTLS** between sidecars.
 
 ## Layout
 

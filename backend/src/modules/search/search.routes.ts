@@ -1,7 +1,10 @@
 import type { Container } from "inversify";
 import { Router } from "express";
 
+import { validateZodQuery } from "@common/middleware/validation.middleware.js";
+
 import { SearchController } from "./search.controller.js";
+import { searchGetQuerySchema } from "./search.validation.js";
 
 /**
  * @openapi
@@ -47,6 +50,8 @@ import { SearchController } from "./search.controller.js";
 export function createSearchRouter(container: Container): Router {
   const controller = container.get<SearchController>(SearchController);
   const router = Router();
-  router.get("/", (req, res) => controller.get(req, res));
+  router.get("/", validateZodQuery(searchGetQuerySchema), (req, res) =>
+    controller.get(req, res),
+  );
   return router;
 }

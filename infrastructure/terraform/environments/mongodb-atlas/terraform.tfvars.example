@@ -15,3 +15,6 @@ private_route_table_ids = ["rtb-xxx", "rtb-yyy", "rtb-zzz"]
 
 # Optional: must not overlap eks_vpc_cidr
 # atlas_container_cidr = "10.8.0.0/21"
+
+# Encryption at rest (module defaults): encryption_at_rest_enabled = true, create_atlas_kms_key = true
+# Outputs: atlas_kms_key_arn — see docs/runbooks/encryption-at-rest.md

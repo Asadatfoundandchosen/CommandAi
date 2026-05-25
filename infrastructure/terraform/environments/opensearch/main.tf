@@ -9,6 +9,8 @@ module "opensearch" {
   allowed_security_group_ids     = var.allowed_security_group_ids
   opensearch_access_principal_arns = var.opensearch_access_principal_arns
   warm_enabled                   = var.warm_enabled
+  encrypt_at_rest_enabled        = true
+  create_dedicated_kms_key       = true
 
   tags = {
     Environment = "shared"

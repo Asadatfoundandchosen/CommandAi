@@ -4,9 +4,11 @@ import { MongoServerError } from "mongodb";
 import { z } from "zod";
 
 import { TYPES } from "../../types.js";
+import { WeakPasswordError } from "../auth/password.service.js";
 import {
   AccountNotInOrganizationError,
   DepartmentNotInAccountError,
+  PlanLimitExceededError,
   UserService,
 } from "./user.service.js";
 import {
@@ -138,8 +140,21 @@ export class UserController {
         res.status(404).json({ error: "invalid account or department hierarchy" });
         return;
       }
+      if (err instanceof PlanLimitExceededError) {
+        res.status(409).json({
+          error: err.message,
+          code: err.code,
+          limit: err.limit,
+          current: err.current,
+        });
+        return;
+      }
       if (isDuplicateKeyError(err)) {
         res.status(409).json({ error: "email already exists for this organization" });
+        return;
+      }
+      if (err instanceof WeakPasswordError) {
+        res.status(400).json({ error: err.message, feedback: err.feedback });
         return;
       }
       throw err;
@@ -241,6 +256,10 @@ export class UserController {
       }
       if (isDuplicateKeyError(err)) {
         res.status(409).json({ error: "email already exists for this organization" });
+        return;
+      }
+      if (err instanceof WeakPasswordError) {
+        res.status(400).json({ error: err.message, feedback: err.feedback });
         return;
       }
       throw err;

@@ -6,6 +6,8 @@ import { queueConnection } from "../connection.js";
 export interface SignalJob {
   signalId: string;
   orgId: string;
+  /** Business unit charged for this signal (24-char hex ObjectId). Omit for system/cron jobs. */
+  accountId?: string;
   agentId: string;
   payload: Record<string, unknown>;
 }

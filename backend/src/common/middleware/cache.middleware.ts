@@ -21,6 +21,9 @@ export const defaultResponseCacheTtlByPath: Record<string, number> = {
   "/api/v1/signals": 10,
   "/api/v1/config": 300,
   "/api/v1/organization": 30,
+  "/api/v1/contracts": 300,
+  "/api/v1/plans": 300,
+  "/api/v1/usage": 60,
   /** Current platform example (tune with `pathTtlOverrides` or add `/api/v1/...` when mounted). */
   "/api/users": 60,
   "/api/webhooks": 30,

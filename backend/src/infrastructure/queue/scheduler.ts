@@ -1,6 +1,11 @@
 import type { Queue } from "bullmq";
 
 import { queues } from "./queues/index.js";
+import {
+  CONTRACT_EXPIRY_DAILY_SCAN_JOB,
+} from "../../modules/contract/contract.expiry-notifications.js";
+import { CONTRACT_RENEWAL_DAILY_SCAN_JOB } from "../../modules/contract/contract-renewal.constants.js";
+import { MFA_POLICY_DAILY_REMINDER_JOB } from "../../modules/mfa-policy/mfa-policy.constants.js";
 import type { NotificationJob } from "./queues/notification.queue.js";
 import type { SignalJob } from "./queues/signal.queue.js";
 
@@ -67,6 +72,45 @@ export const scheduledJobs: ScheduledJobEntry[] = [
       recipientKey: "weekly-report",
       templateId: "weekly-report",
       payload: { type: "weekly-report" },
+    },
+  },
+  {
+    kind: "notification",
+    name: CONTRACT_EXPIRY_DAILY_SCAN_JOB,
+    queue: queues.notifications,
+    cron: "0 7 * * *",
+    timezone: "UTC",
+    data: {
+      orgId: "system",
+      recipientKey: "contract-expiry-scan",
+      templateId: CONTRACT_EXPIRY_DAILY_SCAN_JOB,
+      payload: { type: "contract-expiry-daily-scan" },
+    },
+  },
+  {
+    kind: "notification",
+    name: CONTRACT_RENEWAL_DAILY_SCAN_JOB,
+    queue: queues.notifications,
+    cron: "15 7 * * *",
+    timezone: "UTC",
+    data: {
+      orgId: "system",
+      recipientKey: "contract-renewal-scan",
+      templateId: CONTRACT_RENEWAL_DAILY_SCAN_JOB,
+      payload: { type: "contract-renewal-daily-scan" },
+    },
+  },
+  {
+    kind: "notification",
+    name: MFA_POLICY_DAILY_REMINDER_JOB,
+    queue: queues.notifications,
+    cron: "30 8 * * *",
+    timezone: "UTC",
+    data: {
+      orgId: "system",
+      recipientKey: "mfa-policy-reminder",
+      templateId: MFA_POLICY_DAILY_REMINDER_JOB,
+      payload: { type: MFA_POLICY_DAILY_REMINDER_JOB },
     },
   },
 ];

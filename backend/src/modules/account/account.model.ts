@@ -10,6 +10,10 @@ export interface IAccount {
     credit_limit: number;
     allocated_credits: number;
     used_credits: number;
+    /** Warn when usage reaches this percent of allocated (1–100). */
+    warning_threshold: number;
+    /** Last credit consumption timestamp. */
+    last_usage_at?: Date | null;
   };
   settings: Record<string, unknown>;
   created_by: Types.ObjectId;
@@ -37,6 +41,8 @@ const accountSchema = new Schema<IAccount>(
       credit_limit: { type: Number, default: 0 },
       allocated_credits: { type: Number, default: 0 },
       used_credits: { type: Number, default: 0 },
+      warning_threshold: { type: Number, default: 80, min: 1, max: 100 },
+      last_usage_at: { type: Date, default: null },
     },
     settings: { type: Schema.Types.Mixed, default: {} },
     created_by: { type: Schema.Types.ObjectId, required: true },

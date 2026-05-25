@@ -60,12 +60,17 @@ export function buildSlidingWindowKeys(
 ): { k1: string; k2: string; k3: string } {
   const t = sanitizeKeyPart(tag, 48);
   const u = sanitizeKeyPart(userId, 64);
-  const e = endpointId(ep);
+  const e = endpointId(`${t}:${ep}`);
   return {
-    k1: `swrl:{${t}}:t`,
-    k2: `swrl:{${t}}:u:${u}`,
-    k3: `swrl:{${t}}:e:${e}`,
+    k1: `swrl:{${t}}:tenant`,
+    k2: `swrl:{${t}}:user:${u}`,
+    k3: `swrl:{${t}}:endpoint:${e}`,
   };
+}
+
+/** Seconds until the sliding window resets (conservative). */
+export function retryAfterSeconds(windowMs: number): number {
+  return Math.max(1, Math.ceil(windowMs / 1000));
 }
 
 export type RateLimitResult =

@@ -1,0 +1,12 @@
+aws_region  = "us-east-1"
+environment = "prod"
+
+# From EKS IRSA after platform-api ServiceAccount is created, e.g.:
+# arn:aws:iam::123456789012:role/1commandai-prod-platform-api
+app_role_arns = [
+  "arn:aws:iam::ACCOUNT_ID:role/1commandai-prod-platform-api",
+]
+
+admin_role_arns = [
+  "arn:aws:iam::ACCOUNT_ID:role/1commandai-security-admin",
+]

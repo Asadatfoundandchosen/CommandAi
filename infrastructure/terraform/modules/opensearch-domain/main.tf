@@ -86,7 +86,8 @@ resource "aws_opensearch_domain" "this" {
   }
 
   encrypt_at_rest {
-    enabled = true
+    enabled    = var.encrypt_at_rest_enabled
+    kms_key_id = local.opensearch_kms_key_id
   }
 
   node_to_node_encryption {

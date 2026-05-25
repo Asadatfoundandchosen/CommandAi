@@ -10,6 +10,9 @@ Severity routing (see `infrastructure/k8s/monitoring/`): **P1** → PagerDuty, *
 | Queue / Redis depth                     | [queue-depth-high.md](./queue-depth-high.md)         |
 | MongoDB primary failover (Atlas)        | [mongodb-failover.md](./mongodb-failover.md)         |
 | MongoDB backup / PITR / restore         | [mongodb-restore.md](./mongodb-restore.md)           |
+| Encryption at rest (KMS / Atlas / RDS)  | [encryption-at-rest.md](./encryption-at-rest.md)     |
+| Encryption in transit (TLS / mTLS)      | [encryption-in-transit.md](./encryption-in-transit.md) |
+| Key management (Vault / KMS / rotation) | [key-management.md](./key-management.md)             |
 | Node memory pressure                    | [node-memory-high.md](./node-memory-high.md)         |
 | Node disk utilization                   | [node-disk-high.md](./node-disk-high.md)             |
 | PagerDuty service, escalation, schedule | [pagerduty-onboarding.md](./pagerduty-onboarding.md) |

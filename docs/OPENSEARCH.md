@@ -3,7 +3,7 @@
 ## Role
 
 - **Search and analyze** **audit events** (structured JSON) from the API using **`@opensearch-project/opensearch`** and **`modules/audit/AuditService`**.
-- **Terraform** provisions a **VPC-only** domain: **OpenSearch 2.x**, **3** hot **data** nodes (`r6g.large.search`), **500 GiB gp3** per node, **dedicated masters**, **encryption at rest** + **node-to-node** + **HTTPS** (TLS 1.2+).
+- **Terraform** provisions a **VPC-only** domain: **OpenSearch 2.x**, **3** hot **data** nodes (`r6g.large.search`), **500 GiB gp3** per node, **dedicated masters**, **encryption at rest** (AES-256, **KMS CMK**) + **node-to-node** + **HTTPS** (TLS 1.2+). See **`docs/runbooks/encryption-at-rest.md`**.
 - **Optional UltraWarm** (2 warm nodes, HDD tier) via `warm_enabled` on the module.
 - **Audit indices**: **one index per month** with name **`audit-YYYY.MM`**. **Structured mapping** is defined in **`infrastructure/opensearch/audit-index-template.json`**. **Immutable after write**: the API only **indexes** with `op_type: create` (append-only; no in-place updates). Retention: **ISM** (Index State Management) on `audit-*` (configure in OpenSearch Dashboards or API).
 

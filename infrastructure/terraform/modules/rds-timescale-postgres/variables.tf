@@ -74,7 +74,19 @@ variable "storage_encrypted" {
 variable "kms_key_id" {
   type        = string
   default     = null
-  description = "Optional CMK for storage encryption; omit for aws/rds default."
+  description = "Optional CMK ARN for storage encryption. When null and create_dedicated_kms_key is true, module creates a CMK."
+}
+
+variable "create_dedicated_kms_key" {
+  type        = bool
+  default     = true
+  description = "Create a dedicated AWS KMS CMK for RDS storage encryption (recommended for prod)."
+}
+
+variable "kms_deletion_window_days" {
+  type        = number
+  default     = 30
+  description = "KMS key deletion window when create_dedicated_kms_key is true."
 }
 
 variable "skip_final_snapshot" {

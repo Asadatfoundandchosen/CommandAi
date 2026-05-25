@@ -6,11 +6,14 @@ import type { Request, RequestHandler } from "express";
 import { getRedisClient } from "../../infrastructure/cache/redis-client.js";
 import { recordRateLimit429 } from "../../infrastructure/queue/monitoring/rate-limit-metrics.js";
 
+import { setRateLimitHeaders } from "./rate-limit-headers.middleware.js";
 import {
   buildSlidingWindowKeys,
+  retryAfterSeconds,
   runSlidingWindow,
   sanitizeKeyPart,
 } from "./rate-limit-sliding.js";
+import { resolveRateLimitTiers } from "./rate-limits.config.js";
 import { getOrgIdForRequest } from "./tenant-resolver.js";
 
 function shouldSkipPath(path: string): boolean {
@@ -33,9 +36,18 @@ function getClientKey(req: {
 }
 
 /**
- * **User** for per-user limits: `X-User-Id`, `user_id` query, `req.userId`, or **hashed** client id.
+ * Per-user tag: JWT `sub`, `req.userId` (rate-limit context), headers, or hashed IP.
  */
 function getUserTag(req: Request, clientKey: string): string {
+  if (req.user?.sub) {
+    return sanitizeKeyPart(req.user.sub, 64);
+  }
+  if (typeof req.userId === "string" && req.userId.length > 0) {
+    return sanitizeKeyPart(req.userId, 64);
+  }
+  if (typeof req.apiKeyId === "string" && req.apiKeyId.length > 0) {
+    return sanitizeKeyPart(`apikey:${req.apiKeyId}`, 80);
+  }
   const h = req.headers["x-user-id"] ?? req.headers["X-User-Id"];
   if (typeof h === "string" && h.length > 0) {
     return sanitizeKeyPart(h, 64);
@@ -43,9 +55,6 @@ function getUserTag(req: Request, clientKey: string): string {
   const q = req.query.user_id;
   if (typeof q === "string" && q.length > 0) {
     return sanitizeKeyPart(q, 64);
-  }
-  if (typeof req.userId === "string" && req.userId.length > 0) {
-    return sanitizeKeyPart(req.userId, 64);
   }
   return `ip:${clientKey}`;
 }
@@ -55,9 +64,8 @@ function hashIpUser(clientKey: string): string {
 }
 
 /**
- * express middleware: **sliding window** in Redis (ZADD / ZREMRANGEBYSCORE / ZCARD) in one EVAL;
- * per **tenant**, **user**, and **endpoint**; **429** if any cap is hit.
- * Sets `X-RateLimit-Limit` / `Remaining` / `Reset` from the **tightest** bucket.
+ * Sliding-window rate limiter (Redis ZSET + EVAL).
+ * Limits per **tenant**, **user**, and **endpoint**; returns **429** + **Retry-After** when exceeded.
  */
 export function createRateLimitMiddleware(): RequestHandler {
   return async (req, res, next) => {
@@ -76,18 +84,19 @@ export function createRateLimitMiddleware(): RequestHandler {
     }
 
     const now = Date.now();
-    const rl = config.rateLimit;
+    const nowSec = Math.floor(now / 1000);
     const clientKey = getClientKey(req);
     const tenant = getOrgIdForRequest(req);
     const uRaw = getUserTag(req, clientKey);
     const userTag =
       uRaw === `ip:${clientKey}` ? `anon:${hashIpUser(clientKey)}` : uRaw;
     const ep = `${req.baseUrl || ""}${req.path || ""}`;
+    const tiers = resolveRateLimitTiers(ep);
 
     const keys = buildSlidingWindowKeys(tenant, userTag, ep);
-    const win1 = rl.tenantWindowSec * 1000;
-    const win2 = rl.userWindowSec * 1000;
-    const win3 = rl.endpointWindowSec * 1000;
+    const win1 = tiers.tenant.window * 1000;
+    const win2 = tiers.user.window * 1000;
+    const win3 = tiers.endpoint.window * 1000;
 
     try {
       const result = await runSlidingWindow(
@@ -95,11 +104,11 @@ export function createRateLimitMiddleware(): RequestHandler {
         keys,
         {
           w1Ms: win1,
-          m1: rl.tenantMax,
+          m1: tiers.tenant.max,
           w2Ms: win2,
-          m2: rl.userMax,
+          m2: tiers.user.max,
           w3Ms: win3,
-          m3: rl.endpointMax,
+          m3: tiers.endpoint.max,
         },
         now,
       );
@@ -108,12 +117,17 @@ export function createRateLimitMiddleware(): RequestHandler {
         const dim = result.dim === 1 ? "tenant" : result.dim === 2 ? "user" : "endpoint";
         recordRateLimit429(dim);
         const failM = result.dim === 1 ? result.m1 : result.dim === 2 ? result.m2 : result.m3;
-        const wSec = Math.max(1, Math.ceil(result.wMs / 1000));
-        res.set("X-RateLimit-Limit", String(failM));
-        res.set("X-RateLimit-Remaining", "0");
-        res.set("X-RateLimit-Reset", String(Math.floor(now / 1000) + wSec));
-        res.set("Retry-After", String(wSec));
-        res.status(429).json({ error: "Rate limit exceeded", code: "rate_limit" });
+        const wMs = result.wMs;
+        const retryAfter = retryAfterSeconds(wMs);
+        const resetSec = nowSec + retryAfter;
+
+        setRateLimitHeaders(res, failM, 0, resetSec);
+        res.set("Retry-After", String(retryAfter));
+        res.status(429).json({
+          error: "Too Many Requests",
+          code: "rate_limit",
+          retryAfter,
+        });
         return;
       }
 
@@ -130,10 +144,8 @@ export function createRateLimitMiddleware(): RequestHandler {
           idx = i;
         }
       }
-      res.set("X-RateLimit-Limit", String(lims[idx]!));
-      res.set("X-RateLimit-Remaining", String(remainings[idx]!));
-      const wSec = Math.max(1, Math.ceil(ws[idx]! / 1000));
-      res.set("X-RateLimit-Reset", String(Math.floor(now / 1000) + wSec));
+      const resetSec = nowSec + retryAfterSeconds(ws[idx]!);
+      setRateLimitHeaders(res, lims[idx]!, remainings[idx]!, resetSec);
       next();
     } catch (e) {
       process.stderr.write(`rate limiter EVAL failed (fail open): ${String(e)}\n`);

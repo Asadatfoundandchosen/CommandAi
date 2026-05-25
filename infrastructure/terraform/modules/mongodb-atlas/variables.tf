@@ -102,3 +102,36 @@ variable "backup_snapshot_retention_days" {
   description = "Retention of hourly snapshot chain in days (platform default 30)"
   default     = 30
 }
+
+variable "encryption_at_rest_enabled" {
+  type        = bool
+  description = "Enable Atlas encryption at rest with AWS KMS (CMK per project)."
+  default     = true
+}
+
+variable "create_atlas_kms_key" {
+  type        = bool
+  description = "Create a dedicated AWS KMS CMK for this Atlas project. Set false when passing atlas_kms_key_arn."
+  default     = true
+}
+
+variable "atlas_kms_key_arn" {
+  type        = string
+  default     = null
+  description = "Existing CMK ARN when create_atlas_kms_key is false."
+
+  validation {
+    condition = (
+      var.create_atlas_kms_key ||
+      !var.encryption_at_rest_enabled ||
+      (var.atlas_kms_key_arn != null && var.atlas_kms_key_arn != "")
+    )
+    error_message = "Set atlas_kms_key_arn when create_atlas_kms_key is false and encryption_at_rest_enabled is true."
+  }
+}
+
+variable "kms_deletion_window_days" {
+  type        = number
+  description = "KMS key deletion window (days) when create_atlas_kms_key is true."
+  default     = 30
+}

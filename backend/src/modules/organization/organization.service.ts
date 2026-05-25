@@ -81,6 +81,9 @@ export class OrganizationService {
         locale: input.settings?.locale ?? "en",
         features: input.settings?.features ?? [],
       },
+      subscription: {
+        tier: "starter",
+      },
     };
     return this.organizations.create(doc);
   }

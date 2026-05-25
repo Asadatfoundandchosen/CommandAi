@@ -13,8 +13,10 @@
 
 ## TLS and encryption
 
-- Use **`rediss://`** when in-transit encryption is enabled.
+- **At rest:** **AES-256** via ElastiCache **`at_rest_encryption_enabled`** (Terraform default **true**). Keys are **AWS-managed** (ElastiCache does not support customer CMK for at-rest).
+- **In transit:** **`transit_encryption_enabled`** — use **`rediss://`** in `REDIS_URL`.
 - The backend enables TLS for `rediss` URLs and sets `tls.rejectUnauthorized` in code.
+- Full matrix: **`docs/runbooks/encryption-at-rest.md`**.
 
 ## Bull / BullMQ and Redis Cluster
 

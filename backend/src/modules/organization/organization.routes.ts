@@ -2,8 +2,18 @@ import type { Container } from "inversify";
 import { Router } from "express";
 
 import { requirePlatformAdmin } from "@common/middleware/hierarchy-auth.middleware.js";
+import {
+  validateZodBody,
+  validateZodParams,
+} from "@common/middleware/validation.middleware.js";
 
+import { setOrgCreditRatesBodySchema } from "../credits/credits.validation.js";
 import { OrganizationController } from "./organization.controller.js";
+import {
+  createOrganizationBodySchema,
+  organizationIdParamSchema,
+  updateOrganizationBodySchema,
+} from "./organization.validation.js";
 
 /**
  * @openapi
@@ -121,10 +131,30 @@ export function createOrganizationsRouter(container: Container): Router {
   const controller = container.get(OrganizationController);
   const router = Router();
   router.use(requirePlatformAdmin());
-  router.post("/", (req, res) => controller.create(req, res));
+  router.post("/", validateZodBody(createOrganizationBodySchema), (req, res) =>
+    controller.create(req, res),
+  );
   router.get("/", (req, res) => controller.list(req, res));
-  router.get("/:id", (req, res) => controller.getById(req, res));
-  router.patch("/:id", (req, res) => controller.update(req, res));
-  router.delete("/:id", (req, res) => controller.remove(req, res));
+  router.get("/:id", validateZodParams(organizationIdParamSchema), (req, res) =>
+    controller.getById(req, res),
+  );
+  router.patch(
+    "/:id",
+    validateZodParams(organizationIdParamSchema),
+    validateZodBody(updateOrganizationBodySchema),
+    (req, res) => controller.update(req, res),
+  );
+  router.put(
+    "/:id/credit-rates",
+    validateZodParams(organizationIdParamSchema),
+    validateZodBody(setOrgCreditRatesBodySchema),
+    (req, res) => controller.setCreditRates(req, res),
+  );
+  router.delete("/:id/credit-rates", validateZodParams(organizationIdParamSchema), (req, res) =>
+    controller.clearCreditRates(req, res),
+  );
+  router.delete("/:id", validateZodParams(organizationIdParamSchema), (req, res) =>
+    controller.remove(req, res),
+  );
   return router;
 }

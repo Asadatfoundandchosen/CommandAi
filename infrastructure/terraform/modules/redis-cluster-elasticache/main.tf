@@ -93,6 +93,7 @@ resource "aws_elasticache_replication_group" "this" {
   security_group_ids             = [aws_security_group.redis.id]
   automatic_failover_enabled     = true
   multi_az_enabled               = true
+  # At-rest: AES-256 via **AWS-owned / AWS-managed** keys (ElastiCache does not support customer CMK for at-rest).
   at_rest_encryption_enabled     = true
   transit_encryption_enabled     = true
   auth_token                     = random_password.auth_token.result

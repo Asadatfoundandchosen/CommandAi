@@ -33,3 +33,13 @@ output "master_password" {
   description = "Initial master password — copy once into Vault then rotate; Terraform state is sensitive."
   sensitive   = true
 }
+
+output "storage_encrypted" {
+  value       = var.storage_encrypted
+  description = "Whether RDS storage encryption is enabled."
+}
+
+output "kms_key_arn" {
+  value       = var.create_dedicated_kms_key && var.storage_encrypted ? aws_kms_key.rds[0].arn : var.kms_key_id
+  description = "KMS CMK ARN used for RDS storage encryption."
+}

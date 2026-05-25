@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - deployment.yaml
   - service.yaml
+  - ingress.yaml
   - hooks/job-presync-migrate.yaml
   - hooks/job-postsync-health.yaml
   - hooks/job-syncfail-slack.yaml

@@ -28,6 +28,10 @@ export class AccountRepository {
     }).lean<IAccount | null>();
   }
 
+  async countActiveForOrg(orgId: string): Promise<number> {
+    return AccountModel.countDocuments(activeOrgScope(orgId));
+  }
+
   async listForOrg(orgId: string): Promise<IAccount[]> {
     return AccountModel.find(activeOrgScope(orgId))
       .sort({ created_at: -1 })

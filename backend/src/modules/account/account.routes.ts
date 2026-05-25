@@ -1,7 +1,17 @@
 import type { Container } from "inversify";
 import { Router } from "express";
 
+import {
+  validateZodBody,
+  validateZodParams,
+} from "@common/middleware/validation.middleware.js";
+
 import { AccountController } from "./account.controller.js";
+import {
+  accountIdParamSchema,
+  createAccountBodySchema,
+  updateAccountBodySchema,
+} from "./account.validation.js";
 
 /**
  * @openapi
@@ -147,10 +157,21 @@ import { AccountController } from "./account.controller.js";
 export function createAccountsRouter(container: Container): Router {
   const controller = container.get(AccountController);
   const router = Router();
-  router.post("/", (req, res) => controller.create(req, res));
+  router.post("/", validateZodBody(createAccountBodySchema), (req, res) =>
+    controller.create(req, res),
+  );
   router.get("/", (req, res) => controller.list(req, res));
-  router.get("/:id", (req, res) => controller.getById(req, res));
-  router.patch("/:id", (req, res) => controller.update(req, res));
-  router.delete("/:id", (req, res) => controller.remove(req, res));
+  router.get("/:id", validateZodParams(accountIdParamSchema), (req, res) =>
+    controller.getById(req, res),
+  );
+  router.patch(
+    "/:id",
+    validateZodParams(accountIdParamSchema),
+    validateZodBody(updateAccountBodySchema),
+    (req, res) => controller.update(req, res),
+  );
+  router.delete("/:id", validateZodParams(accountIdParamSchema), (req, res) =>
+    controller.remove(req, res),
+  );
   return router;
 }

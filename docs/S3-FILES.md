@@ -4,7 +4,7 @@
 
 - **Name:** `1commandai-files-<environment>` (Terraform)
 - **Versioning:** enabled (required for cross-region replication)
-- **Encryption:** **SSE-KMS** (dedicated key per primary bucket; replica has its own key in the DR region)
+- **Encryption:** **SSE-KMS** (AES-256, **customer-managed CMK** per primary bucket; bucket default encryption; replica has its own CMK in the DR region). Runbook: **`docs/runbooks/encryption-at-rest.md`**.
 - **Access:** private — **block all public access**; HTTPS-only bucket policy (deny insecure transport)
 - **CRR:** optional replica `1commandai-files-<env>-dr-<replicaRegionSanitized>` in a second AWS **region** (e.g. `us-west-2` as DR for `us-east-1`)
 

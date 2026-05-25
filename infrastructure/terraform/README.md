@@ -215,6 +215,41 @@ Copy **`terraform.tfvars.example`** to **`terraform.tfvars`** (gitignored) to ov
 | **Reusable modules** | Pass | All environments use `source = "../../modules/..."` for **vpc** and **security-groups**; **prod** adds **eks** (and Helm uses EKS outputs). |
 | **README documents modules and variables** | Pass | This file: module sections, examples, environment + module variable tables above. |
 
+## Key management (Vault + AWS KMS)
+
+| Component | Location |
+|-----------|----------|
+| **Application CMK** | `modules/kms-app-encryption` — `enable_key_rotation`, app/admin IAM policies |
+| **Environment stack** | `environments/key-management/` |
+| **Vault transit** | `infrastructure/vault/`, `scripts/vault/setup-transit-keys.sh` |
+| **Rotation CI** | `.github/workflows/key-rotation.yml` |
+
+Runbook: **`docs/runbooks/key-management.md`**.
+
+## Encryption in transit
+
+| Component | TLS | Location |
+|-----------|-----|----------|
+| **API (ALB)** | TLS 1.3 policy `ELBSecurityPolicy-TLS13-1-2-2021-06`, ACM, HTTP→HTTPS | `modules/alb-api-https`, `k8s/base/ingress.yaml` |
+| **Mesh** | Istio **STRICT** mTLS | `infrastructure/k8s/istio/mesh/` |
+| **App** | HSTS, optional HTTPS redirect | `backend` `https-security.middleware.ts` |
+
+Runbook: **`docs/runbooks/encryption-in-transit.md`**. SSL Labs **A+** target after ACM + DNS cutover.
+
+## Encryption at rest
+
+All persistent stores use **AES-256** at rest. **Customer-managed KMS keys** are created in Terraform modules where supported:
+
+| Module | CMK | Notes |
+|--------|-----|--------|
+| `mongodb-atlas` | Per Atlas project | `encryption.tf` — Atlas BYOK + IAM role |
+| `s3-files-bucket` | Per bucket | SSE-KMS default encryption |
+| `rds-timescale-postgres` | Per RDS stack | `storage_encrypted` + `create_dedicated_kms_key` |
+| `opensearch-domain` | Per domain | `encrypt_at_rest` + CMK |
+| `redis-cluster-elasticache` | AWS-managed only | `at_rest_encryption_enabled` (no CMK) |
+
+Operational verification and incident steps: **`docs/runbooks/encryption-at-rest.md`**.
+
 ## Cross-stack references
 
 - **Same repo, another root module:** use `terraform_remote_state` in the consuming stack pointing at the same bucket/key as the producer environment, or pass IDs via CI/CD variables.

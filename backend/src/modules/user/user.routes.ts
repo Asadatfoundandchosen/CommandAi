@@ -1,7 +1,14 @@
 import type { Container } from "inversify";
 import { Router } from "express";
 
+import { validate, validateParams } from "@common/middleware/validation.middleware.js";
+
 import { UserController } from "./user.controller.js";
+import {
+  createUserSchema,
+  updateUserSchema,
+  userIdParamJoiSchema,
+} from "./user.validation.js";
 
 /**
  * @openapi
@@ -14,7 +21,7 @@ import { UserController } from "./user.controller.js";
  * /users:
  *   post:
  *     tags: [Users]
- *     summary: Create user (password hashed server-side; never returned)
+ *     summary: Create user (Argon2id hash server-side; zxcvbn score >= 3; never returned)
  *     security:
  *       - hierarchyRole: []
  *     parameters:
@@ -60,7 +67,8 @@ import { UserController } from "./user.controller.js";
  *               mfa_enabled: { type: boolean }
  *     responses:
  *       201: { description: Created (body excludes password_hash) }
- *       400: { description: Bad request }
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
  *       401: { description: Missing role or actor }
  *       403: { description: Forbidden }
  *       404: { description: Invalid hierarchy }
@@ -205,10 +213,19 @@ import { UserController } from "./user.controller.js";
 export function createUsersRouter(container: Container): Router {
   const controller = container.get(UserController);
   const router = Router();
-  router.post("/", (req, res) => controller.create(req, res));
+  router.post("/", validate(createUserSchema), (req, res) => controller.create(req, res));
   router.get("/", (req, res) => controller.list(req, res));
-  router.get("/:id", (req, res) => controller.getById(req, res));
-  router.patch("/:id", (req, res) => controller.update(req, res));
-  router.delete("/:id", (req, res) => controller.remove(req, res));
+  router.get("/:id", validateParams(userIdParamJoiSchema), (req, res) =>
+    controller.getById(req, res),
+  );
+  router.patch(
+    "/:id",
+    validateParams(userIdParamJoiSchema),
+    validate(updateUserSchema),
+    (req, res) => controller.update(req, res),
+  );
+  router.delete("/:id", validateParams(userIdParamJoiSchema), (req, res) =>
+    controller.remove(req, res),
+  );
   return router;
 }

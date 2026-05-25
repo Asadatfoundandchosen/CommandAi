@@ -107,3 +107,27 @@ variable "master_user_name" {
   default     = "os_master"
   description = "Built-in master user when internal user DB is enabled."
 }
+
+variable "encrypt_at_rest_enabled" {
+  type        = bool
+  default     = true
+  description = "Enable encryption at rest on the OpenSearch domain."
+}
+
+variable "create_dedicated_kms_key" {
+  type        = bool
+  default     = true
+  description = "Create a dedicated AWS KMS CMK for domain encryption at rest."
+}
+
+variable "kms_key_id" {
+  type        = string
+  default     = null
+  description = "Optional existing CMK ARN; used when create_dedicated_kms_key is false."
+}
+
+variable "kms_deletion_window_days" {
+  type        = number
+  default     = 30
+  description = "KMS key deletion window when create_dedicated_kms_key is true."
+}

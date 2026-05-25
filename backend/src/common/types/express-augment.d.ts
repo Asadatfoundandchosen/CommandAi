@@ -1,12 +1,18 @@
-import type { JwtPayload } from "jsonwebtoken";
+import type { TokenPayload } from "@modules/auth/jwt.service.js";
 
 declare global {
   namespace Express {
     interface Request {
-      /** Set by `authenticateJwt` — JWT payload (must include `org_id` for tenant APIs). */
-      user?: JwtPayload & { org_id?: string };
+      /** Set by `authenticateJwt` — access JWT payload (`org_id`, `role`, `sub`). */
+      user?: TokenPayload;
       /** Canonical org ObjectId hex from JWT (`tenantMiddleware`). */
       tenantId?: string;
+      /** Effective RBAC grants (`resource:action:scope`) from `createLoadUserPermissionsMiddleware`. */
+      userPermissions?: string[];
+      /** Set by `createApiKeyAuthMiddleware` when `X-API-Key` / Bearer `1cmd_…` is valid. */
+      apiKeyId?: string;
+      apiKeyAccountId?: string | null;
+      apiKeyRateLimit?: number;
     }
   }
 }

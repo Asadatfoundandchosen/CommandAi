@@ -1,0 +1,32 @@
+# Production north–south TLS on the mesh ingress (alternative/complement to AWS ALB).
+# 1. Create TLS secret: kubectl create secret tls api-gateway-tls -n istio-system --cert=tls.crt --key=tls.key
+#    (sync from ACM via External Secrets, or cert-manager Certificate)
+# 2. Replace `api.example.com` with your public API hostname.
+# 3. kubectl apply -f gateway-public-https.yaml
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: public-gateway-tls
+  namespace: istio-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - api.example.com
+      tls:
+        httpsRedirect: true
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      hosts:
+        - api.example.com
+      tls:
+        mode: SIMPLE
+        credentialName: api-gateway-tls
+        minProtocolVersion: TLSV1_3

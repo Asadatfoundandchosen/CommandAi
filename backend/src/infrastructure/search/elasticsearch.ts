@@ -24,7 +24,10 @@ let client: Client | null = null;
 
 function normalizeNode(node: string): string {
   const t = node.trim();
-  if (t.startsWith("http://") || t.startsWith("https://")) {
+  if (t.startsWith("http://")) {
+    return t;
+  }
+  if (t.startsWith("https://")) {
     return t;
   }
   return `https://${t}`;

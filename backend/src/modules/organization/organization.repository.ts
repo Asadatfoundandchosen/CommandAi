@@ -24,6 +24,10 @@ export class OrganizationRepository {
     return OrganizationModel.findOne({ slug }).lean<IOrganization | null>();
   }
 
+  async findByStripeCustomerId(customerId: string): Promise<IOrganization | null> {
+    return OrganizationModel.findOne({ "stripe.customer_id": customerId }).lean<IOrganization | null>();
+  }
+
   async list(): Promise<IOrganization[]> {
     return OrganizationModel.find()
       .sort({ created_at: -1 })

@@ -35,13 +35,13 @@ export const swaggerSpec = swaggerJsdoc({
           description:
             "Platform admin token for Organization CRUD only (same value as PLATFORM_ADMIN_TOKEN)",
         },
-        /** MVP caller role; production should use JWT claims instead. */
+        /** Caller role from JWT `role` claim (legacy fallback: **X-User-Role** header). */
         hierarchyRole: {
           type: "apiKey",
           in: "header",
           name: "X-User-Role",
           description:
-            "One of: org_admin, account_admin, dept_manager, dept_user. Minimum role varies by route group.",
+            "Prefer JWT access token `role` claim. Legacy header: org_admin | account_admin | dept_manager | dept_user.",
         },
         apiKey: { type: "apiKey", in: "header", name: "X-API-Key" },
       },
@@ -52,5 +52,6 @@ export const swaggerSpec = swaggerJsdoc({
     join(srcOrDistRoot, "modules", "**", `*.controller.${ext}`),
     join(srcOrDistRoot, "common", "**", `*.routes.${ext}`),
     join(srcOrDistRoot, "common", "**", `*.controller.${ext}`),
+    join(srcOrDistRoot, "common", "validation", `validation.openapi.${ext}`),
   ],
 });

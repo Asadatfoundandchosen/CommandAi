@@ -1,7 +1,17 @@
 import type { Container } from "inversify";
 import { Router } from "express";
 
+import {
+  validateZodBody,
+  validateZodParams,
+} from "@common/middleware/validation.middleware.js";
+
 import { DepartmentController } from "./department.controller.js";
+import {
+  createDepartmentBodySchema,
+  departmentIdParamSchema,
+  updateDepartmentBodySchema,
+} from "./department.validation.js";
 
 /**
  * @openapi
@@ -168,10 +178,21 @@ import { DepartmentController } from "./department.controller.js";
 export function createDepartmentsRouter(container: Container): Router {
   const controller = container.get(DepartmentController);
   const router = Router();
-  router.post("/", (req, res) => controller.create(req, res));
+  router.post("/", validateZodBody(createDepartmentBodySchema), (req, res) =>
+    controller.create(req, res),
+  );
   router.get("/", (req, res) => controller.list(req, res));
-  router.get("/:id", (req, res) => controller.getById(req, res));
-  router.patch("/:id", (req, res) => controller.update(req, res));
-  router.delete("/:id", (req, res) => controller.remove(req, res));
+  router.get("/:id", validateZodParams(departmentIdParamSchema), (req, res) =>
+    controller.getById(req, res),
+  );
+  router.patch(
+    "/:id",
+    validateZodParams(departmentIdParamSchema),
+    validateZodBody(updateDepartmentBodySchema),
+    (req, res) => controller.update(req, res),
+  );
+  router.delete("/:id", validateZodParams(departmentIdParamSchema), (req, res) =>
+    controller.remove(req, res),
+  );
   return router;
 }

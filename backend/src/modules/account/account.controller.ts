@@ -4,13 +4,25 @@ import { MongoServerError } from "mongodb";
 import { z } from "zod";
 
 import { TYPES } from "../../types.js";
+import { AccountBudgetService } from "../credits/account-budget.service.js";
+import {
+  AccountAllocationLimitError,
+  CreditAllocationService,
+} from "../credits/credit-allocation.service.js";
+import { InsufficientCreditsError } from "../credits/credit.service.js";
+import {
+  AccountNotInOrganizationError,
+  OrganizationNotFoundError as HierarchyOrganizationNotFoundError,
+} from "../../common/validators/hierarchy.validator.js";
 import {
   AccountService,
   OrganizationNotFoundError,
+  PlanLimitExceededError,
 } from "./account.service.js";
 import {
   accountActorUserIdSchema,
   accountIdParamSchema,
+  allocateCreditsBodySchema,
   createAccountBodySchema,
   updateAccountBodySchema,
 } from "./account.validation.js";
@@ -40,6 +52,10 @@ function parseActorUserId(req: Request): z.SafeParseReturnType<string, string> {
 export class AccountController {
   constructor(
     @inject(TYPES.AccountService) private readonly accounts: AccountService,
+    @inject(TYPES.CreditAllocationService)
+    private readonly creditAllocation: CreditAllocationService,
+    @inject(TYPES.AccountBudgetService)
+    private readonly accountBudgets: AccountBudgetService,
   ) {}
 
   create = async (req: Request, res: Response): Promise<void> => {
@@ -65,6 +81,15 @@ export class AccountController {
     } catch (err) {
       if (err instanceof OrganizationNotFoundError) {
         res.status(404).json({ error: "organization not found" });
+        return;
+      }
+      if (err instanceof PlanLimitExceededError) {
+        res.status(409).json({
+          error: err.message,
+          code: err.code,
+          limit: err.limit,
+          current: err.current,
+        });
         return;
       }
       if (isDuplicateKeyError(err)) {
@@ -146,6 +171,77 @@ export class AccountController {
         return;
       }
       throw err;
+    }
+  };
+
+  /** `POST /api/v1/accounts/:id/allocate` — move credits from org pool to account budget. */
+  allocate = async (req: Request, res: Response): Promise<void> => {
+    const p = accountIdParamSchema.safeParse(req.params);
+    if (!p.success) {
+      res.status(400).json({ error: p.error.flatten() });
+      return;
+    }
+    const orgId = requireTenantOrg(req, res);
+    if (orgId === undefined) {
+      return;
+    }
+    const actor = parseActorUserId(req);
+    if (!actor.success) {
+      res.status(400).json({
+        error: "x-user-id header required (24-char hex ObjectId)",
+      });
+      return;
+    }
+    const body = allocateCreditsBodySchema.safeParse(req.body);
+    if (!body.success) {
+      res.status(400).json({ error: body.error.flatten() });
+      return;
+    }
+    try {
+      const result = await this.creditAllocation.allocateToAccount({
+        orgId,
+        accountId: p.data.id,
+        amount: body.data.amount,
+        createdBy: actor.data,
+        description: body.data.description,
+      });
+      await this.accountBudgets.syncFromAccount(result.account);
+      res.status(200).json({
+        data: {
+          org_balance: result.orgBalance,
+          account: result.account,
+          transaction_id: result.transactionId,
+        },
+      });
+    } catch (e) {
+      if (e instanceof InsufficientCreditsError) {
+        res.status(409).json({
+          error: "Insufficient org credit balance",
+          code: "INSUFFICIENT_ORG_CREDITS",
+          requested: e.requested,
+          available: e.available,
+        });
+        return;
+      }
+      if (e instanceof AccountAllocationLimitError) {
+        res.status(409).json({
+          error: e.message,
+          code: "ACCOUNT_ALLOCATION_LIMIT",
+          credit_limit: e.creditLimit,
+          allocated_after: e.allocatedAfter,
+        });
+        return;
+      }
+      if (e instanceof AccountNotInOrganizationError) {
+        res.status(404).json({ error: "account not found" });
+        return;
+      }
+      if (e instanceof HierarchyOrganizationNotFoundError) {
+        res.status(404).json({ error: "organization not found" });
+        return;
+      }
+      const message = e instanceof Error ? e.message : "Allocation failed";
+      res.status(400).json({ error: message });
     }
   };
 

@@ -15,6 +15,8 @@ import {
   querySignalMetricsDailyRange,
   querySignalMetricsHourlyRange,
   querySignalMetricsRange,
+  queryCreditUsageByAccountSince,
+  queryCreditUsageTrendDaily,
 } from "./timescale.js";
 
 export { getMongooseConnectOptions, wireMongooseConnectionEvents } from "./mongodb.js";
@@ -42,6 +44,8 @@ export {
   querySignalMetricsDailyRange,
   querySignalMetricsHourlyRange,
   querySignalMetricsRange,
+  queryCreditUsageByAccountSince,
+  queryCreditUsageTrendDaily,
 };
 export type {
   CreditUsageRow,
@@ -53,6 +57,8 @@ export type {
   SignalMetricsRollupRangeParams,
   SignalMetricsRollupRow,
   TimescaleConnectionConfig,
+  CreditUsageByAccountRow,
+  CreditUsageTrendRow,
 } from "./timescale.js";
 
 export function createDatabasePlaceholder(): { uri: string } {

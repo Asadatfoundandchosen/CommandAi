@@ -20,6 +20,8 @@ import { registerRateLimitMetrics } from "./rate-limit-metrics.js";
 import { registerPubSubMetrics } from "../../pubsub/pubsub-metrics.js";
 import { registerResponseCacheMetrics } from "./response-cache-metrics.js";
 import { registerCacheInvalidationMetrics } from "../../cache/cache-invalidation-metrics.js";
+import { registerAuthMetrics } from "../../../modules/auth/auth-metrics.js";
+import { registerPermissionCacheMetrics } from "../../../modules/rbac/permission-cache.metrics.js";
 import { startSessionMetrics, stopSessionMetrics } from "./session-metrics.js";
 
 export { startQueueMetricsCollector, stopQueueMetricsCollector, stopSessionMetrics };
@@ -34,6 +36,8 @@ export function setupQueueMonitoring(app: Express): void {
   registerResponseCacheMetrics(queueMetricsRegister);
   registerCacheInvalidationMetrics(queueMetricsRegister);
   registerPubSubMetrics(queueMetricsRegister);
+  registerAuthMetrics(queueMetricsRegister);
+  registerPermissionCacheMetrics(queueMetricsRegister);
   startMongoPoolMetrics(
     queueMetricsRegister,
     config.queueMonitoring.metricsIntervalMs,

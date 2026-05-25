@@ -15,6 +15,7 @@ import {
 import { gracefulShutdown } from "./common/utils/shutdown.js";
 import { createApp } from "./app.js";
 import { container } from "./container.js";
+import { RoleService } from "./modules/rbac/role.service.js";
 import { connectRedis, getRedisClient, quitRedis } from "./infrastructure/cache/index.js";
 import { initCacheInvalidationEventListeners } from "./infrastructure/cache/invalidation.js";
 import {
@@ -58,6 +59,11 @@ async function bootstrap(): Promise<void> {
     wireMongooseConnectionEvents(mongoose);
     await mongoose.connect(config.mongodb.uri, getMongooseConnectOptions());
     registerMongoDisconnect(() => mongoose.disconnect());
+    try {
+      await container.get(RoleService).ensureSystemRolesSeeded();
+    } catch (e) {
+      process.stderr.write(`System roles seed failed: ${String(e)}\n`);
+    }
     if (config.mongodb.analytics) {
       try {
         await connectMongodbAnalytics();

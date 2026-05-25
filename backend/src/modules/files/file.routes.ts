@@ -1,7 +1,13 @@
 import type { Container } from "inversify";
 import { Router } from "express";
 
+import { validateZodBody } from "@common/middleware/validation.middleware.js";
+
 import { FilesController } from "./file.controller.js";
+import {
+  presignDownloadBodySchema,
+  presignUploadBodySchema,
+} from "./file.validation.js";
 
 /**
  * @openapi
@@ -31,8 +37,10 @@ import { FilesController } from "./file.controller.js";
 export function createFilesRouter(container: Container): Router {
   const controller = container.get<FilesController>(FilesController);
   const router = Router();
-  router.post("/presign-upload", (req, res) => controller.presignUpload(req, res));
-  router.post("/presign-download", (req, res) =>
+  router.post("/presign-upload", validateZodBody(presignUploadBodySchema), (req, res) =>
+    controller.presignUpload(req, res),
+  );
+  router.post("/presign-download", validateZodBody(presignDownloadBodySchema), (req, res) =>
     controller.presignDownload(req, res),
   );
   return router;

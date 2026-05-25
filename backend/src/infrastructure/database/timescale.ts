@@ -1,3 +1,5 @@
+import { config } from "@config/index.js";
+import { pgSslOptions } from "@config/tls-policy.js";
 import pg from "pg";
 
 const { Pool } = pg;
@@ -73,6 +75,7 @@ export async function connectTimescale(
   if (pool) {
     return pool;
   }
+  const ssl = pgSslOptions(config.env);
   const next = new Pool({
     connectionString: cfg.connectionString,
     min: cfg.minPoolSize,
@@ -80,6 +83,7 @@ export async function connectTimescale(
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
     allowExitOnIdle: true,
+    ...(ssl ? { ssl } : {}),
   });
   await next.query("SELECT 1");
   pool = next;
@@ -337,4 +341,60 @@ export async function querySignalMetricsDailyRange(
   params: SignalMetricsRollupRangeParams,
 ): Promise<SignalMetricsRollupRow[]> {
   return querySignalMetricsRollup("signal_metrics_daily", params);
+}
+
+export type CreditUsageByAccountRow = {
+  account_id: string;
+  usage_type: string;
+  amount: number;
+};
+
+/** Credit consumption grouped by account and usage type since `from`. */
+export async function queryCreditUsageByAccountSince(
+  orgId: string,
+  from: Date,
+): Promise<CreditUsageByAccountRow[]> {
+  const p = assertPool();
+  const sql = `SELECT account_id::text AS account_id,
+      COALESCE(NULLIF(metadata->>'type', ''), NULLIF(metadata->>'usage_type', ''), 'other') AS usage_type,
+      SUM(credits)::float AS amount
+    FROM credit_usage
+    WHERE org_id = $1::uuid AND "time" >= $2
+    GROUP BY account_id, usage_type
+    ORDER BY account_id, usage_type`;
+  const res = await p.query<CreditUsageByAccountRow>(sql, [orgId, from]);
+  return res.rows.map((r) => ({
+    account_id: String(r.account_id),
+    usage_type: String(r.usage_type),
+    amount: Number(r.amount),
+  }));
+}
+
+export type CreditUsageTrendRow = {
+  bucket: Date;
+  total: number;
+};
+
+/** Daily credit usage trend for dashboard charts. */
+export async function queryCreditUsageTrendDaily(
+  orgId: string,
+  from: Date,
+  to: Date,
+): Promise<CreditUsageTrendRow[]> {
+  const p = assertPool();
+  const sql = `SELECT time_bucket('1 day', "time") AS bucket,
+      SUM(credits)::float AS total
+    FROM credit_usage
+    WHERE org_id = $1::uuid AND "time" >= $2 AND "time" < $3
+    GROUP BY bucket
+    ORDER BY bucket ASC`;
+  const res = await p.query<{ bucket: Date; total: string | number }>(sql, [
+    orgId,
+    from,
+    to,
+  ]);
+  return res.rows.map((r) => ({
+    bucket: r.bucket,
+    total: Number(r.total),
+  }));
 }

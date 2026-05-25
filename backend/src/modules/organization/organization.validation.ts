@@ -30,3 +30,5 @@ export type UpdateOrganizationBody = z.infer<typeof updateOrganizationBodySchema
 export const organizationIdParamSchema = z.object({
   id: z.string().length(24).regex(/^[a-fA-F0-9]{24}$/, "invalid organization id"),
 });
+
+export { setOrgCreditRatesBodySchema } from "../credits/credits.validation.js";

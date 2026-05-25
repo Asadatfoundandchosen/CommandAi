@@ -1,6 +1,7 @@
 import type { ConnectOptions } from "mongoose";
 
 import { config } from "@config/index.js";
+import { mongooseTlsOptions } from "@config/tls-policy.js";
 
 /**
  * Mongoose / driver connection options.
@@ -10,6 +11,7 @@ import { config } from "@config/index.js";
  */
 export function getMongooseConnectOptions(): ConnectOptions {
   return {
+    ...mongooseTlsOptions(config.env, config.mongodb.uri),
     readPreference: "primaryPreferred" as const,
     retryWrites: true,
     writeConcern: { w: "majority" as const, wtimeoutMS: 5000 },
