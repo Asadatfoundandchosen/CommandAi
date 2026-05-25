@@ -10,6 +10,7 @@ import {
   InvalidApiKeyError,
   OrganizationNotFoundError,
 } from "./api-key.service.js";
+import { AdminAuditService } from "../audit/admin-audit.service.js";
 import {
   apiKeyIdParamSchema,
   createApiKeyBodySchema,
@@ -19,7 +20,10 @@ import {
 
 @injectable()
 export class ApiKeyController {
-  constructor(@inject(ApiKeyService) private readonly apiKeys: ApiKeyService) {}
+  constructor(
+    @inject(ApiKeyService) private readonly apiKeys: ApiKeyService,
+    @inject(AdminAuditService) private readonly adminAudit: AdminAuditService,
+  ) {}
 
   create = async (req: Request, res: Response): Promise<void> => {
     const orgId = req.tenantId;
@@ -36,7 +40,8 @@ export class ApiKeyController {
     }
 
     try {
-      const created = await this.apiKeys.createKey(orgId, userId, parsed.data);
+      const auditActor = this.adminAudit.actorFromRequest(req) ?? undefined;
+      const created = await this.apiKeys.createKey(orgId, userId, parsed.data, auditActor);
       res.status(201).json({
         data: created,
         message: "Store the key securely; it will not be shown again.",
@@ -109,7 +114,14 @@ export class ApiKeyController {
     }
 
     try {
-      const updated = await this.apiKeys.updateKey(orgId, idParsed.data, userId, bodyParsed.data);
+      const auditActor = this.adminAudit.actorFromRequest(req) ?? undefined;
+      const updated = await this.apiKeys.updateKey(
+        orgId,
+        idParsed.data,
+        userId,
+        bodyParsed.data,
+        auditActor,
+      );
       res.status(200).json({ data: updated });
     } catch (e) {
       this.sendError(res, e);
@@ -131,7 +143,13 @@ export class ApiKeyController {
     }
 
     try {
-      const revoked = await this.apiKeys.revokeKey(orgId, idParsed.data, userId);
+      const auditActor = this.adminAudit.actorFromRequest(req) ?? undefined;
+      const revoked = await this.apiKeys.revokeKey(
+        orgId,
+        idParsed.data,
+        userId,
+        auditActor,
+      );
       res.status(200).json({ data: revoked });
     } catch (e) {
       this.sendError(res, e);
@@ -153,7 +171,13 @@ export class ApiKeyController {
     }
 
     try {
-      const rotated = await this.apiKeys.rotateKey(orgId, idParsed.data, userId);
+      const auditActor = this.adminAudit.actorFromRequest(req) ?? undefined;
+      const rotated = await this.apiKeys.rotateKey(
+        orgId,
+        idParsed.data,
+        userId,
+        auditActor,
+      );
       res.status(200).json({
         data: rotated,
         message: "Store the new key securely; it will not be shown again.",

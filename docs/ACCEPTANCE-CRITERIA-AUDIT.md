@@ -1,8 +1,13 @@
 # Acceptance Criteria Audit
 
 **Project:** 1CommandAI Command Center  
-**Audit date:** 2026-05-22  
-**Scope:** Security & auth stories (code + IaC evidence; live deploy not verified unless noted)
+**Audit date:** 2026-05-25  
+**Scope:** Code + IaC evidence; live deploy not verified unless noted
+
+| Part | Stories | Description |
+|------|---------|-------------|
+| **I — Auth & security** | 1–29 | Prior platform security / auth acceptance audit |
+| **II — Audit & compliance** | 30–38 | **New stories built** — audit logging, search, export, retention |
 
 **Status legend**
 
@@ -11,6 +16,10 @@
 | **Met** | Implemented with clear code path and/or automated test |
 | **Partial** | Implemented but missing deploy proof, SLO benchmark, UI wiring, or env-specific gap |
 | **Not met** | Missing or contradictory to acceptance criteria |
+
+---
+
+# Part I — Auth & Security
 
 ---
 
@@ -449,7 +458,167 @@
 
 ---
 
+# Part II — Audit & Compliance (New Stories)
+
+Stories **30–38** audit the **new audit/compliance work** (core logging, CRUD plugin, search, export, auth/admin event logging, change tracking, immutability, retention).
+
+### New stories summary (30–38)
+
+| Story | Met | Partial | Not met | Pass rate |
+|-------|-----|---------|---------|-----------|
+| 30 Audit Schema & Logging | 6 | 0 | 0 | 100% |
+| 31 CRUD Plugin | 4 | 2 | 0 | 67% |
+| 32 Audit Search | 2 | 4 | 0 | 33% |
+| 33 Audit Export | 2 | 4 | 0 | 33% |
+| 34 Auth Event Audit | 5 | 1 | 0 | 83% |
+| 35 Admin Actions | 3 | 1 | 1 | 50% |
+| 36 Change Tracking | 3 | 2 | 1 | 50% |
+| 37 Immutable Storage | 4 | 2 | 0 | 67% |
+| 38 Retention Policies | 3 | 3 | 0 | 50% |
+| **Subtotal (54 criteria)** | **32** | **19** | **2** | **59% Met** |
+
+**Headline:** Core schema, auth events, and immutability are strong; search/export need integration tests; admin org-settings audit and array-level diffs are the main functional gaps.
+
+---
+
+## Story 30: Audit Schema & Core Logging
+
+| # | Acceptance criterion | Status | Evidence / notes |
+|---|----------------------|--------|------------------|
+| 1 | Audit schema defined | Met | `IAuditLog` — `backend/src/modules/audit/audit.model.ts` |
+| 2 | All required fields present | Met | `org_id`, `timestamp`, `actor`, `action`, `resource`, `request_id`, optional `trace_id`, `changes`, `checksum` |
+| 3 | Saved to MongoDB | Met | `AuditService.log()` → `AuditLogModel.save()` |
+| 4 | Indexed to Elasticsearch | Met | `indexAuditEvent()` → OpenSearch `op_type: "create"` on `audit-YYYY.MM` (ES-compatible API) |
+| 5 | Request ID tracked | Met | `x-request-id`, audit context, or `randomUUID()` — `audit.service.ts` |
+| 6 | IP and user agent captured | Met | `actor.ip_address`, `actor.user_agent` via `extractActor()` |
+
+**Story score:** 6 Met · 0 Partial · 0 Not met
+
+---
+
+## Story 31: CRUD Plugin Auto-Logging
+
+| # | Acceptance criterion | Status | Evidence / notes |
+|---|----------------------|--------|------------------|
+| 1 | Creates logged | Met | `post("save")` + `insertMany` — `mongoose-audit.plugin.ts` |
+| 2 | Updates logged with before/after | Met | Pre-save / `findOneAndUpdate` / `updateOne` + `buildAuditChanges()` |
+| 3 | Deletes logged | Met | Soft-delete detection, `deleteOne`, `findOneAndDelete` |
+| 4 | Bulk operations logged | Partial | `updateMany` / `deleteMany` log aggregate metadata + counts, not per-document diffs |
+| 5 | Plugin applied to all models | Met | `applyAuditPluginsToAllModels()` at startup (all models except `AuditLog`) |
+| 6 | No operations missed | Partial | `updateMany` lacks per-doc audit; some admin routes skip `logAdminAction` |
+
+**Story score:** 4 Met · 2 Partial · 0 Not met
+
+---
+
+## Story 32: Audit Search
+
+| # | Acceptance criterion | Status | Evidence / notes |
+|---|----------------------|--------|------------------|
+| 1 | Search by time range works | Partial | `from`/`to` → `range` on `timestamp` — `audit-search.query.ts`; shallow unit test |
+| 2 | Search by actor works | Partial | `actor_id` / `user_id` bool query; no isolated test |
+| 3 | Search by action works | Partial | Case-insensitive wildcard on `action` |
+| 4 | Full-text search works | Partial | `multi_match` on 12 fields via `q` param |
+| 5 | Results scoped to org | Met | Mandatory `org_id` term + JWT `req.tenantId` + `rejectCrossTenantOrgHint()` |
+| 6 | Pagination works | Met | `page`/`limit` → `from`/`size`, `track_total_hits`, response metadata |
+
+**Story score:** 2 Met · 4 Partial · 0 Not met
+
+---
+
+## Story 33: Audit Export
+
+| # | Acceptance criterion | Status | Evidence / notes |
+|---|----------------------|--------|------------------|
+| 1 | CSV export works | Partial | `auditHitsToCsv()` + inline download; CSV unit tests; no E2E |
+| 2 | JSON export works | Partial | `auditHitsToJson()` + attachment response; no unit/E2E tests |
+| 3 | Large exports use background job | Met | `>10,000` rows → BullMQ `audit-export`, HTTP 202 + `jobId` |
+| 4 | Email notification sent | Partial | SendGrid on async job; skipped if unconfigured; failures don't fail job |
+| 5 | Download URL is signed | Met | `FileService.getDownloadUrl()` — AWS presigned GET, 15m TTL |
+| 6 | Export scoped to org | Met | JWT tenant only; search filter includes mandatory `org_id` |
+
+**Story score:** 2 Met · 4 Partial · 0 Not met
+
+---
+
+## Story 34: Auth Event Audit Logging
+
+| # | Acceptance criterion | Status | Evidence / notes |
+|---|----------------------|--------|------------------|
+| 1 | Login success logged | Met | `AuthAuditService.logLoginSuccess()` → `auth.login.success` |
+| 2 | Login failure logged with attempt count | Partial | Failures logged via `logLoginFailed()`; **`failed_attempts` not in audit metadata** (only in token logger / suspicious-activity counters) |
+| 3 | Logout logged | Met | `logLogout()` → `auth.logout` |
+| 4 | Password change logged | Met | `logPasswordChanged()` — `user.service.ts` |
+| 5 | MFA events logged | Met | enable/verify/disable — `mfa.service.ts`, `sms-mfa.service.ts` |
+| 6 | IP and location captured | Met | `metadata.location`, `metadata.device`, `actor.ip_address` — `extractClientContext()` |
+
+**Story score:** 5 Met · 1 Partial · 0 Not met
+
+---
+
+## Story 35: Admin Action Logging
+
+| # | Acceptance criterion | Status | Evidence / notes |
+|---|----------------------|--------|------------------|
+| 1 | Role changes logged | Met | `AdminAuditService.logUserRoleChange()` — `user.service.ts` |
+| 2 | Org settings changes logged | Not met | `ORG_SETTINGS_CHANGED` defined but **never emitted**; SSO/group/SCIM mapping, credit-alert settings lack admin audit |
+| 3 | Before/after captured | Partial | Present where `logAdminAction()` passes `changes`; inconsistent elsewhere |
+| 4 | API key operations logged | Met | create/revoke/update/rotate — `api-key.service.ts` |
+| 5 | SSO config changes logged | Met | SAML/OIDC upsert → `admin.sso.configured` |
+| 6 | Critical actions alert | Met | `AdminCriticalAlertService` + `[ADMIN ALERT]` + `admin_critical_action_total` |
+
+**Story score:** 3 Met · 1 Partial · 1 Not met
+
+---
+
+## Story 36: Change Tracking
+
+| # | Acceptance criterion | Status | Evidence / notes |
+|---|----------------------|--------|------------------|
+| 1 | Changes captured on update | Met | Mongoose plugin + `buildAuditChanges()` on update paths |
+| 2 | Field-level diffs accurate | Partial | Top-level keys only in `trackChanges()` |
+| 3 | Before/after state stored | Met | `changes.before` / `changes.after` (sanitized) |
+| 4 | Internal fields excluded | Met | `CHANGE_TRACK_SKIP_FIELDS` + `sanitizeAuditSnapshot()` |
+| 5 | Nested object changes tracked | Partial | Whole nested object in diff (e.g. `budget: { from, to }`), not nested field paths |
+| 6 | Array changes tracked | Not met | Arrays compared as atomic top-level values; no element-level diff |
+
+**Story score:** 3 Met · 2 Partial · 1 Not met
+
+---
+
+## Story 37: Immutable Audit Storage
+
+| # | Acceptance criterion | Status | Evidence / notes |
+|---|----------------------|--------|------------------|
+| 1 | Audit logs indexed | Met | OpenSearch index on every `AuditService.log()` |
+| 2 | Checksum added to each log | Met | `AuditIntegrityService.attachChecksum()` — `createAuditChecksum()` |
+| 3 | Index becomes read-only | Partial | ISM policy in `audit-immutable-lifecycle-policy.json`; **not auto-applied** at runtime |
+| 4 | Update attempts rejected | Met | Mongoose pre-hooks on `audit_logs` collection |
+| 5 | Delete attempts rejected | Partial | Mongoose hooks block normal deletes; **retention job uses `collection.deleteMany()` bypass** |
+| 6 | Checksum verification works | Met | Verify on search hits + `getChangeHistory()`; unit tests; `[AUDIT ALERT]` on mismatch |
+
+**Story score:** 4 Met · 2 Partial · 0 Not met
+
+---
+
+## Story 38: Retention Policies
+
+| # | Acceptance criterion | Status | Evidence / notes |
+|---|----------------------|--------|------------------|
+| 1 | Retention configurable per org | Met | `retention_policies` + `GET/PUT /api/v1/organization/retention-policy` |
+| 2 | Minimum 1 year enforced | Met | 365-day min in Zod, Mongoose schema, `validateRetentionDays()`, unit tests |
+| 3 | Archive before delete works | Partial | Archive runs before delete when enabled; optional off; no E2E test |
+| 4 | S3 archive created | Partial | `uploadAuditArchive()` with `GLACIER`; requires S3 config + integration test |
+| 5 | Old logs deleted after archive | Partial | Mongo delete after archive in code; OpenSearch `delete_by_query` best-effort; no E2E |
+| 6 | Compliance report shows policy | Met | `generateComplianceReport()` embeds full `policy` object; `RetentionPolicyAdmin` UI |
+
+**Story score:** 3 Met · 3 Partial · 0 Not met
+
+---
+
 ## Overall summary
+
+### Part I — Auth & security (Stories 1–29)
 
 | Story | Met | Partial | Not met | Pass rate |
 |-------|-----|---------|---------|-----------|
@@ -482,11 +651,46 @@
 | 27 Encryption in Transit | 3 | 3 | 0 | 50% |
 | 28 Field Encryption | 5 | 1 | 0 | 83% |
 | 29 Key Management | 1 | 5 | 0 | 17% |
-| **Total (174 criteria)** | **147** | **27** | **0** | **84% Met** |
+| **Subtotal (174 criteria)** | **147** | **27** | **0** | **84% Met** |
+
+### Part II — Audit & compliance (New stories 30–38)
+
+| Story | Met | Partial | Not met | Pass rate |
+|-------|-----|---------|---------|-----------|
+| 30 Audit Schema & Logging | 6 | 0 | 0 | 100% |
+| 31 CRUD Plugin | 4 | 2 | 0 | 67% |
+| 32 Audit Search | 2 | 4 | 0 | 33% |
+| 33 Audit Export | 2 | 4 | 0 | 33% |
+| 34 Auth Event Audit | 5 | 1 | 0 | 83% |
+| 35 Admin Actions | 3 | 1 | 1 | 50% |
+| 36 Change Tracking | 3 | 2 | 1 | 50% |
+| 37 Immutable Storage | 4 | 2 | 0 | 67% |
+| 38 Retention Policies | 3 | 3 | 0 | 50% |
+| **Subtotal (54 criteria)** | **32** | **19** | **2** | **59% Met** |
+
+### Combined total
+
+| | Met | Partial | Not met | Pass rate |
+|---|-----|---------|---------|-----------|
+| **All stories (228 criteria)** | **179** | **46** | **2** | **79% Met** |
 
 ---
 
 ## Recommended follow-ups (by impact)
+
+### New stories (30–38)
+
+| Priority | Story | Action |
+|----------|-------|--------|
+| P0 | 35 Admin Actions | Emit `ORG_SETTINGS_CHANGED`; wire group/SSO/SCIM mapping + credit-alert settings to `logAdminAction` |
+| P0 | 34 Auth Event Audit | Add `failed_attempts` to `logLoginFailed()` audit metadata |
+| P1 | 32 Audit Search | Integration tests for each filter + full-text against mocked OpenSearch |
+| P1 | 33 Audit Export | E2E tests for CSV/JSON sync export and async email + presigned URL flow |
+| P1 | 36 Change Tracking | Nested field paths and array element diffs in `trackChanges()` |
+| P1 | 37 Immutable Storage | Automate ISM policy apply; Mongo integration tests for hook rejections |
+| P1 | 38 Retention | E2E archive → delete cycle; fail job if archive fails when `archive_before_delete` |
+
+### Auth & security (1–29)
 
 | Priority | Story | Action |
 |----------|-------|--------|
@@ -501,4 +705,4 @@
 
 ---
 
-*Generated from codebase audit. Re-run after significant auth/security changes.*
+*Generated from codebase audit. Re-run after significant auth/security/audit changes.*

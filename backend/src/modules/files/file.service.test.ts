@@ -25,12 +25,15 @@ test("validateUploadSizeBytes enforces 100MB max", () => {
   validateUploadSizeBytes(MAX_UPLOAD_BYTES);
 });
 
-test("assertKeyBelongsToOrg accepts uploads/ and audit-exports/ prefixes", () => {
+test("assertKeyBelongsToOrg accepts uploads/, audit-exports/, and audit-archives/ prefixes", () => {
   assert.doesNotThrow(() =>
     assertKeyBelongsToOrg("org1", "uploads/org1/uuid/file.pdf"),
   );
   assert.doesNotThrow(() =>
     assertKeyBelongsToOrg("org1", "audit-exports/org1/export.csv"),
+  );
+  assert.doesNotThrow(() =>
+    assertKeyBelongsToOrg("org1", "audit-archives/org1/archive.jsonl"),
   );
   assert.throws(() => assertKeyBelongsToOrg("org1", "org1/other/file.pdf"));
   assert.throws(() => assertKeyBelongsToOrg("org1", "uploads/org2/x"));

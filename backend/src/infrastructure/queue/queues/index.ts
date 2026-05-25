@@ -9,8 +9,10 @@ export {
   webhookDeliveryQueue,
   type WebhookDeliveryJob,
 } from "./webhook-delivery.queue.js";
+export { auditExportQueue, type AuditExportJob } from "./audit-export.queue.js";
 
 import { auditQueue } from "./audit.queue.js";
+import { auditExportQueue } from "./audit-export.queue.js";
 import { executionQueue } from "./execution.queue.js";
 import { notificationQueue } from "./notification.queue.js";
 import { signalQueue } from "./signal.queue.js";
@@ -22,5 +24,6 @@ export const queues = {
   execution: executionQueue,
   notifications: notificationQueue,
   audit: auditQueue,
+  auditExport: auditExportQueue,
   webhooks: webhookDeliveryQueue,
 } as const;

@@ -7,6 +7,7 @@ import mongoose from "mongoose";
 import type { Express } from "express";
 
 import { config } from "./config/index.js";
+import { setAuditService } from "@common/audit/audit.registry.js";
 import { createSessionMiddleware } from "./common/middleware/session.middleware.js";
 import {
   getMongooseConnectOptions,
@@ -46,6 +47,8 @@ import {
   closeOpenSearch,
   connectOpenSearch,
 } from "./infrastructure/search/index.js";
+import { applyAuditPluginsToAllModels } from "./infrastructure/database/apply-audit-plugins.js";
+import { AuditService } from "./modules/audit/audit.service.js";
 
 let app!: Express;
 
@@ -59,6 +62,8 @@ async function bootstrap(): Promise<void> {
     wireMongooseConnectionEvents(mongoose);
     await mongoose.connect(config.mongodb.uri, getMongooseConnectOptions());
     registerMongoDisconnect(() => mongoose.disconnect());
+    applyAuditPluginsToAllModels();
+    setAuditService(container.get(AuditService));
     try {
       await container.get(RoleService).ensureSystemRolesSeeded();
     } catch (e) {

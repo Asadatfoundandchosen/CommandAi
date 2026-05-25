@@ -54,3 +54,4 @@ export {
   validateZodQuery,
   validateZodParams,
 } from "./validation.middleware.js";
+export { createAuditContextMiddleware } from "./audit-context.middleware.js";

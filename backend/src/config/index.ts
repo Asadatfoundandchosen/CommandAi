@@ -104,6 +104,8 @@ const envSchema = Joi.object({
   RATE_LIMIT_ENDPOINT_WINDOW_SEC: Joi.number().integer().min(1).max(3600).default(60),
   RATE_LIMIT_ENDPOINT_MAX: Joi.number().integer().min(1).default(100),
   RATE_LIMIT_EXPENSIVE_MAX: Joi.number().integer().min(1).default(10),
+  /** Maximum configurable audit log retention per org (days). Minimum enforced at 365 in app logic. */
+  AUDIT_RETENTION_MAX_DAYS: Joi.number().integer().min(365).default(3650),
   /**
    * GET **JSON** response **cache-aside** (Redis). See `cache.middleware.ts` for path → TTL table.
    */
@@ -456,6 +458,10 @@ export const config = {
           fromNumber: envVars.TWILIO_FROM_NUMBER,
         }
       : null,
+  /** Per-org audit log retention caps (see `modules/retention`). */
+  retention: {
+    maxAuditDays: envVars.AUDIT_RETENTION_MAX_DAYS,
+  },
 } as const;
 
 export type AppConfig = typeof config;

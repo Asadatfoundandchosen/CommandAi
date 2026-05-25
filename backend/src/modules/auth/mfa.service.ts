@@ -12,6 +12,8 @@ import {
   buildBackupCodeStatus,
   type BackupCodeStatus,
 } from "./backup-codes.service.js";
+import type { ClientContext } from "./auth-session.types.js";
+import { AuthAuditService } from "./auth-audit.service.js";
 
 export const TOTP_ISSUER = "1CommandAI" as const;
 export const TOTP_WINDOW = 1;
@@ -67,6 +69,7 @@ export class InvalidMfaTokenError extends Error {
 export class MfaService {
   constructor(
     @inject(BackupCodesService) private readonly backupCodes: BackupCodesService,
+    @inject(AuthAuditService) private readonly authAudit: AuthAuditService,
   ) {}
 
   verifyTOTP(secretBase32: string, token: string): boolean {
@@ -129,6 +132,7 @@ export class MfaService {
   async verifyAndEnableTOTP(
     userId: string,
     token: string,
+    clientContext?: ClientContext,
   ): Promise<TotpVerifyResult> {
     const user = await UserModel.findOne({
       _id: userId,
@@ -158,6 +162,12 @@ export class MfaService {
 
     const plainCodes = await this.backupCodes.generateBackupCodes(userId);
 
+    await this.authAudit.logMfaEnabled(clientContext, {
+      userId,
+      orgId: String(user.org_id),
+      method: "totp",
+    });
+
     return {
       mfa_enabled: true,
       backupCodes: plainCodes,
@@ -166,7 +176,7 @@ export class MfaService {
   }
 
   /** Disable TOTP after verifying current code (TOTP or backup). */
-  async disableTOTP(userId: string, token: string): Promise<void> {
+  async disableTOTP(userId: string, token: string, clientContext?: ClientContext): Promise<void> {
     const user = await UserModel.findOne({
       _id: userId,
       is_deleted: false,
@@ -199,6 +209,12 @@ export class MfaService {
         $unset: { "mfa.totp_secret_enc": "" },
       },
     );
+
+    await this.authAudit.logMfaDisabled(clientContext, {
+      userId,
+      orgId: String(user.org_id),
+      method: "totp",
+    });
   }
 
   /**

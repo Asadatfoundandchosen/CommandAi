@@ -2,12 +2,14 @@ import { inject, injectable } from "inversify";
 import type { Request, Response } from "express";
 
 import { MfaPolicyService } from "./mfa-policy.service.js";
+import { AdminAuditService } from "../audit/admin-audit.service.js";
 import { upsertMfaPolicyBodySchema } from "./mfa-policy.validation.js";
 
 @injectable()
 export class MfaPolicyController {
   constructor(
     @inject(MfaPolicyService) private readonly policies: MfaPolicyService,
+    @inject(AdminAuditService) private readonly adminAudit: AdminAuditService,
   ) {}
 
   /** `GET /api/v1/organization/mfa-policy` */
@@ -57,13 +59,18 @@ export class MfaPolicyController {
       ? new Date(parsed.data.enforcement_date)
       : undefined;
 
-    const policy = await this.policies.upsertPolicy(orgId, {
-      enabled: parsed.data.enabled,
-      required_for: parsed.data.required_for,
-      grace_period_days: parsed.data.grace_period_days,
-      allowed_methods: parsed.data.allowed_methods,
-      enforcement_date: enforcementDate,
-    });
+    const auditActor = this.adminAudit.actorFromRequest(req) ?? undefined;
+    const policy = await this.policies.upsertPolicy(
+      orgId,
+      {
+        enabled: parsed.data.enabled,
+        required_for: parsed.data.required_for,
+        grace_period_days: parsed.data.grace_period_days,
+        allowed_methods: parsed.data.allowed_methods,
+        enforcement_date: enforcementDate,
+      },
+      auditActor,
+    );
 
     res.status(200).json({ data: policy });
   };

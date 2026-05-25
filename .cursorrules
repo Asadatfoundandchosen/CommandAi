@@ -1,0 +1,31 @@
+# 1CommandAI — Cursor rules (platform monorepo)
+
+You are building **1CommandAI** on **github.com/1commandai/platform**.
+
+## Repository layout
+
+- **frontend/** — Lovable prototype export (React UI). In this clone, UI may live at **src/** until migrated.
+- **backend/** — Express + TypeScript API (Cursor-built). Modules under `backend/src/modules/`.
+- **shared/types/** — Shared API contracts (`User`, `Agent`, `TenantRole`). **Do not duplicate** — import from `@shared/types/api` or `shared/types/api.ts`.
+- **shared/openapi/** — Generated OpenAPI JSON (`npm run openapi:export`). Spec source: `@openapi` JSDoc in backend routes.
+
+## When building backend APIs
+
+1. Read the **frontend component** that will consume the endpoint (`src/components/*.tsx` or `frontend/src/components/`).
+2. Match request/response shapes to **shared/types/api.ts**; extend shared types if the contract changes.
+3. Add **Zod** validation (`*.validation.ts`) and **@openapi** JSDoc on routes/controllers.
+4. **org_id from JWT only** — never trust tenant id from request body on authenticated routes.
+5. After route changes: `npm run openapi:export` and `npm run openapi:types`.
+
+## References
+
+- Architecture: `docs/ARCHITECTURE.md`, `.cursor/rules/SYSTEM-PROMPT.mdc`
+- API contract: `docs/API-CONTRACT.md`
+- Cursor + Lovable: `docs/CURSOR-INTEGRATION.md`
+- OpenAPI UI: `GET /api/docs` (backend running)
+
+## Code standards
+
+- TypeScript strict, no `any`
+- Backend: InversifyJS, feature modules, `@modules/*` `@common/*` `@config/*`
+- Frontend: Redux Toolkit + RTK Query, Tailwind + Shadcn, Vite

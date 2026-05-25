@@ -2,12 +2,16 @@ import { inject, injectable } from "inversify";
 import type { Request, Response } from "express";
 
 import { OidcService } from "../auth/oidc.service.js";
+import { AdminAuditService } from "../audit/admin-audit.service.js";
 import { upsertOrgOidcConfigBodySchema } from "../auth/oidc.validation.js";
 import { OIDC_ISSUER_HINTS } from "../auth/oidc.constants.js";
 
 @injectable()
 export class OrganizationOidcController {
-  constructor(@inject(OidcService) private readonly oidc: OidcService) {}
+  constructor(
+    @inject(OidcService) private readonly oidc: OidcService,
+    @inject(AdminAuditService) private readonly adminAudit: AdminAuditService,
+  ) {}
 
   /** `GET /api/v1/organization/oidc` — org OIDC config (no client secret). */
   get = async (req: Request, res: Response): Promise<void> => {
@@ -44,7 +48,8 @@ export class OrganizationOidcController {
       return;
     }
     try {
-      const data = await this.oidc.upsertOrgOidcConfig(orgId, parsed.data);
+      const auditActor = this.adminAudit.actorFromRequest(req) ?? undefined;
+      const data = await this.oidc.upsertOrgOidcConfig(orgId, parsed.data, auditActor);
       res.status(200).json({ data });
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to save OIDC config";

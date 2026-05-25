@@ -17,9 +17,10 @@
     "paths": {
       "@modules/*": ["modules/*"],
       "@common/*": ["common/*"],
-      "@config/*": ["config/*"]
+      "@config/*": ["config/*"],
+      "@shared/*": ["../../shared/*"]
     }
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "../shared/types/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

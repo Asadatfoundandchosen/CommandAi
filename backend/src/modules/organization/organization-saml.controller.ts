@@ -2,11 +2,15 @@ import { inject, injectable } from "inversify";
 import type { Request, Response } from "express";
 
 import { SamlService } from "../auth/saml.service.js";
+import { AdminAuditService } from "../audit/admin-audit.service.js";
 import { upsertOrgSamlConfigBodySchema } from "../auth/saml.validation.js";
 
 @injectable()
 export class OrganizationSamlController {
-  constructor(@inject(SamlService) private readonly saml: SamlService) {}
+  constructor(
+    @inject(SamlService) private readonly saml: SamlService,
+    @inject(AdminAuditService) private readonly adminAudit: AdminAuditService,
+  ) {}
 
   /** `GET /api/v1/organization/saml` — org SAML config (no private keys). */
   get = async (req: Request, res: Response): Promise<void> => {
@@ -43,7 +47,8 @@ export class OrganizationSamlController {
       return;
     }
     try {
-      const data = await this.saml.upsertOrgSamlConfig(orgId, parsed.data);
+      const auditActor = this.adminAudit.actorFromRequest(req) ?? undefined;
+      const data = await this.saml.upsertOrgSamlConfig(orgId, parsed.data, auditActor);
       res.status(200).json({ data });
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to save SAML config";

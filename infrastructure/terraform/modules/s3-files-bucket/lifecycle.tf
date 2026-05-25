@@ -22,6 +22,26 @@ resource "aws_s3_bucket_lifecycle_configuration" "files" {
     }
   }
 
+# **`audit-archives/`** — **GLACIER** at upload; lifecycle may transition further. No expiration (compliance archives).
+
+  rule {
+    id     = "audit-archives-glacier"
+    status = "Enabled"
+
+    filter {
+      prefix = "audit-archives/"
+    }
+
+    transition {
+      days          = 90
+      storage_class = "GLACIER"
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+
   rule {
     id     = "audit-keep-forever"
     status = "Enabled"

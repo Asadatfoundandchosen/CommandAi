@@ -6,6 +6,9 @@ import { decryptField, encryptField } from "@common/utils/field-encryption.js";
 import type { IOrganization, OrgOidcConfig } from "@modules/organization/organization.model.js";
 import { OrganizationModel } from "@modules/organization/organization.model.js";
 import { TYPES } from "../../types.js";
+import { AdminAuditService } from "../audit/admin-audit.service.js";
+import { ADMIN_EVENTS } from "../audit/admin-events.js";
+import type { AdminAuditActor } from "../audit/admin-audit.service.js";
 
 import { logAuthTokenOperation } from "./auth-token.logger.js";
 import type { LoginResult } from "./auth.service.js";
@@ -65,6 +68,7 @@ export class OidcService {
     @inject(TYPES.AuthService) private readonly auth: AuthService,
     @inject(JitProvisioningService) private readonly jit: JitProvisioningService,
     @inject(GroupMappingService) private readonly groupMapping: GroupMappingService,
+    @inject(AdminAuditService) private readonly adminAudit: AdminAuditService,
   ) {}
 
   redirectUri(orgId: string): string {
@@ -86,11 +90,14 @@ export class OidcService {
   async upsertOrgOidcConfig(
     orgId: string,
     body: UpsertOrgOidcConfigBody,
+    auditActor?: AdminAuditActor,
   ): Promise<OrgOidcConfigView> {
     const org = await OrganizationModel.findById(orgId).lean<IOrganization | null>();
     if (!org) {
       throw new Error("Organization not found");
     }
+
+    const beforeView = org.oidc ? this.toConfigView(orgId, org.oidc) : null;
 
     const next: OrgOidcConfig = {
       ...(org.oidc ?? {
@@ -122,7 +129,22 @@ export class OidcService {
 
     await OrganizationModel.updateOne({ _id: orgId }, { $set: { oidc: next } });
 
-    return this.toConfigView(orgId, next);
+    const view = this.toConfigView(orgId, next);
+    if (auditActor) {
+      await this.adminAudit.logAdminAction(
+        ADMIN_EVENTS.SSO_CONFIGURED,
+        orgId,
+        auditActor,
+        { type: "organization", id: orgId, name: org.name },
+        {
+          ...(beforeView ? { before: oidcConfigAuditSnapshot(beforeView) } : {}),
+          after: oidcConfigAuditSnapshot(view),
+        },
+        { sso_type: "oidc" },
+      );
+    }
+
+    return view;
   }
 
   /** Authorization code flow with PKCE — returns IdP authorization URL. */
@@ -275,4 +297,20 @@ export class OidcService {
     }
     return org;
   }
+}
+
+function oidcConfigAuditSnapshot(
+  config: Pick<
+    OrgOidcConfigView,
+    "enabled" | "provider" | "issuer_url" | "client_id" | "scopes"
+  >,
+): Record<string, unknown> {
+  return {
+    enabled: config.enabled,
+    provider: config.provider,
+    issuer_url: config.issuer_url,
+    client_id: config.client_id,
+    scopes: config.scopes,
+    client_secret_set: true,
+  };
 }

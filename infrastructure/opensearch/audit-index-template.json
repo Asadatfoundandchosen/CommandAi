@@ -3,19 +3,33 @@
   "template": {
     "settings": {
       "number_of_shards": 1,
-      "number_of_replicas": 1
+      "number_of_replicas": 1,
+      "index.blocks.write": false,
+      "index.blocks.read_only_allow_delete": false
     },
     "mappings": {
+      "_source": { "enabled": true },
       "properties": {
         "timestamp": { "type": "date" },
         "org_id": { "type": "keyword" },
+        "actor_type": { "type": "keyword" },
+        "actor_id": { "type": "keyword" },
+        "actor_email": { "type": "keyword" },
         "user_id": { "type": "keyword" },
         "action": { "type": "keyword" },
         "resource": { "type": "keyword" },
+        "resource_type": { "type": "keyword" },
         "resource_id": { "type": "keyword" },
+        "resource_name": { "type": "text" },
         "changes": { "type": "object", "enabled": false },
         "ip_address": { "type": "ip" },
-        "user_agent": { "type": "text" }
+        "user_agent": { "type": "text" },
+        "metadata": { "type": "object", "enabled": false },
+        "request_id": { "type": "keyword" },
+        "trace_id": { "type": "keyword" },
+        "checksum": { "type": "keyword" },
+        "actor": { "type": "object", "enabled": false },
+        "resource_obj": { "type": "object", "enabled": false }
       }
     }
   },

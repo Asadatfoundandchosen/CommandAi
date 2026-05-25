@@ -24,6 +24,7 @@ export const EXPENSIVE_PATH_PREFIXES: readonly string[] = [
   "/api/search",
   "/api/files",
   "/api/v1/credits/transactions/export",
+  "/api/v1/audit/export",
   "/api/v1/usage",
   "/api/billing/stripe/webhook",
 ];

@@ -7,6 +7,9 @@ import {
   PlanLimitsValidator,
 } from "../../common/validators/plan-limits.validator.js";
 import { TYPES } from "../../types.js";
+import { AdminAuditService } from "../audit/admin-audit.service.js";
+import { ADMIN_EVENTS } from "../audit/admin-events.js";
+import type { AdminAuditActor } from "../audit/admin-audit.service.js";
 import type { IAccount } from "./account.model.js";
 import { AccountRepository, type CreateAccountDoc } from "./account.repository.js";
 
@@ -33,12 +36,15 @@ export class AccountService {
     private readonly hierarchy: HierarchyValidator,
     @inject(TYPES.PlanLimitsValidator)
     private readonly planLimits: PlanLimitsValidator,
+    @inject(AdminAuditService)
+    private readonly adminAudit: AdminAuditService,
   ) {}
 
   async create(
     orgId: string,
     actorUserId: string,
     input: CreateAccountInput,
+    auditActor?: AdminAuditActor,
   ): Promise<IAccount> {
     await this.hierarchy.assertOrganizationExists(orgId);
     await this.planLimits.assertCanCreateAccount(orgId);
@@ -57,7 +63,17 @@ export class AccountService {
       updated_by: new mongoose.Types.ObjectId(actorUserId),
       is_deleted: false,
     };
-    return this.accounts.create(doc);
+    const created = await this.accounts.create(doc);
+    if (auditActor) {
+      await this.adminAudit.logAdminAction(
+        ADMIN_EVENTS.ACCOUNT_CREATED,
+        orgId,
+        auditActor,
+        { type: "account", id: String(created._id), name: created.name },
+        { after: { ...created } as unknown as Record<string, unknown> },
+      );
+    }
+    return created;
   }
 
   async getById(orgId: string, id: string): Promise<IAccount | null> {
@@ -73,6 +89,7 @@ export class AccountService {
     id: string,
     actorUserId: string,
     input: UpdateAccountInput,
+    auditActor?: AdminAuditActor,
   ): Promise<IAccount | null> {
     const existing = await this.accounts.findByIdForOrg(id, orgId);
     if (!existing) {
@@ -99,7 +116,20 @@ export class AccountService {
         ...input.settings,
       };
     }
-    return this.accounts.updateForOrg(id, orgId, { $set: setDoc });
+    const updated = await this.accounts.updateForOrg(id, orgId, { $set: setDoc });
+    if (updated && auditActor) {
+      await this.adminAudit.logAdminAction(
+        ADMIN_EVENTS.ACCOUNT_UPDATED,
+        orgId,
+        auditActor,
+        { type: "account", id, name: updated.name },
+        {
+          before: { ...existing } as unknown as Record<string, unknown>,
+          after: { ...updated } as unknown as Record<string, unknown>,
+        },
+      );
+    }
+    return updated;
   }
 
   async remove(orgId: string, id: string, actorUserId: string): Promise<boolean> {

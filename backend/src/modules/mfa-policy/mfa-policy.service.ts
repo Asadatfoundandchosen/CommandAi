@@ -1,9 +1,12 @@
-import { injectable } from "inversify";
+import { inject, injectable } from "inversify";
 import type { Types } from "mongoose";
 
 import type { IUser } from "@modules/user/user.model.js";
 import { UserModel } from "@modules/user/user.model.js";
 import { OrganizationModel } from "@modules/organization/organization.model.js";
+import { AdminAuditService } from "../audit/admin-audit.service.js";
+import { ADMIN_EVENTS } from "../audit/admin-events.js";
+import type { AdminAuditActor } from "../audit/admin-audit.service.js";
 
 import {
   DEFAULT_ALLOWED_METHODS,
@@ -47,6 +50,11 @@ export type MfaEnforcementEvaluation = {
 
 @injectable()
 export class MfaPolicyService {
+  constructor(
+    @inject(AdminAuditService)
+    private readonly adminAudit: AdminAuditService,
+  ) {}
+
   async getPolicyForOrg(orgId: string): Promise<MfaPolicyView | null> {
     const doc = await MfaPolicyModel.findOne({ org_id: orgId }).lean<IMFAPolicy | null>();
     if (!doc) {
@@ -55,7 +63,13 @@ export class MfaPolicyService {
     return this.toView(doc);
   }
 
-  async upsertPolicy(orgId: string, input: UpsertMfaPolicyInput): Promise<MfaPolicyView> {
+  async upsertPolicy(
+    orgId: string,
+    input: UpsertMfaPolicyInput,
+    auditActor?: AdminAuditActor,
+  ): Promise<MfaPolicyView> {
+    const beforeDoc = await MfaPolicyModel.findOne({ org_id: orgId }).lean<IMFAPolicy | null>();
+    const beforeView = beforeDoc ? this.toView(beforeDoc) : null;
     const enforcementDate = input.enforcement_date ?? new Date();
     const doc = await MfaPolicyModel.findOneAndUpdate(
       { org_id: orgId },
@@ -76,7 +90,21 @@ export class MfaPolicyService {
       throw new Error("Failed to persist MFA policy");
     }
 
-    return this.toView(doc);
+    const view = this.toView(doc);
+    if (auditActor) {
+      await this.adminAudit.logAdminAction(
+        ADMIN_EVENTS.MFA_POLICY_CHANGED,
+        orgId,
+        auditActor,
+        { type: "mfa_policy", id: orgId },
+        {
+          ...(beforeView ? { before: { ...beforeView } } : {}),
+          after: { ...view },
+        },
+      );
+    }
+
+    return view;
   }
 
   async evaluateForUser(

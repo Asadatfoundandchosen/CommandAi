@@ -1,0 +1,29 @@
+{
+  "_comment": "Elasticsearch **ILM** for **audit-*** (self-managed ES 8.x). OpenSearch uses ISM: infrastructure/opensearch/ism/audit-immutable-lifecycle-policy.json. Apply: PUT _ilm/policy/audit-immutable-lifecycle",
+  "policy": {
+    "phases": {
+      "hot": {
+        "min_age": "0ms",
+        "actions": {
+          "set_priority": { "priority": 100 }
+        }
+      },
+      "warm": {
+        "min_age": "1d",
+        "actions": {
+          "readonly": {}
+        }
+      },
+      "cold": {
+        "min_age": "7d",
+        "actions": {
+          "forcemerge": { "max_num_segments": 1 }
+        }
+      },
+      "delete": {
+        "min_age": "90d",
+        "actions": { "delete": {} }
+      }
+    }
+  }
+}

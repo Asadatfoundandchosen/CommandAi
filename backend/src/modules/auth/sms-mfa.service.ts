@@ -1,5 +1,5 @@
 import { randomInt, timingSafeEqual } from "node:crypto";
-import { injectable } from "inversify";
+import { inject, injectable } from "inversify";
 import twilio from "twilio";
 
 import {
@@ -12,6 +12,8 @@ import { UserModel } from "@modules/user/user.model.js";
 
 import { logSmsMfaOperation } from "./sms-mfa.logger.js";
 import { validatePhoneNumber } from "./phone.validation.js";
+import type { ClientContext } from "./auth-session.types.js";
+import { AuthAuditService } from "./auth-audit.service.js";
 
 export const SMS_CODE_TTL_SEC = 300;
 export const SMS_CODE_LENGTH = 6;
@@ -70,6 +72,10 @@ export class SmsMfaNotEnabledError extends Error {
 
 @injectable()
 export class SmsMfaService {
+  constructor(
+    @inject(AuthAuditService) private readonly authAudit: AuthAuditService,
+  ) {}
+
   private twilioClient(): ReturnType<typeof twilio> | null {
     const tw = config.twilio;
     if (!tw) {
@@ -163,6 +169,7 @@ export class SmsMfaService {
   async verifyAndEnableSmsMfa(
     userId: string,
     code: string,
+    clientContext?: ClientContext,
   ): Promise<{ mfa_enabled: true; sms_enabled: true; phone_number: string }> {
     const redis = this.redis();
     const stored = await redis.get(smsMfaCodeKey(userId));
@@ -178,6 +185,10 @@ export class SmsMfaService {
     }
 
     await redis.del(smsMfaCodeKey(userId), smsMfaPhoneKey(userId));
+
+    const user = await UserModel.findOne({ _id: userId, is_deleted: false })
+      .select("org_id")
+      .lean<{ org_id: { toString(): string } } | null>();
 
     const phoneEnc = encryptFieldsForUpdate(USER_ENCRYPTED_FIELDS, {
       phone_number: phone,
@@ -199,10 +210,18 @@ export class SmsMfaService {
       phone_last4: phone.slice(-4),
     });
 
+    if (user) {
+      await this.authAudit.logMfaEnabled(clientContext, {
+        userId,
+        orgId: String(user.org_id),
+        method: "sms",
+      });
+    }
+
     return { mfa_enabled: true, sms_enabled: true, phone_number: phone };
   }
 
-  async disableSmsMfa(userId: string): Promise<void> {
+  async disableSmsMfa(userId: string, clientContext?: ClientContext): Promise<void> {
     const user = await UserModel.findOne({
       _id: userId,
       is_deleted: false,
@@ -234,5 +253,11 @@ export class SmsMfaService {
 
     const redis = this.redis();
     await redis.del(smsMfaCodeKey(userId), smsMfaPhoneKey(userId));
+
+    await this.authAudit.logMfaDisabled(clientContext, {
+      userId,
+      orgId: String(user.org_id),
+      method: "sms",
+    });
   }
 }

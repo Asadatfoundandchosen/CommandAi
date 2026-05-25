@@ -8,6 +8,7 @@ import {
   AccountNotInOrganizationError,
   DepartmentService,
 } from "./department.service.js";
+import { AdminAuditService } from "../audit/admin-audit.service.js";
 import {
   departmentActorUserIdSchema,
   departmentIdParamSchema,
@@ -78,6 +79,7 @@ function resolveTenantScope(
 export class DepartmentController {
   constructor(
     @inject(TYPES.DepartmentService) private readonly departments: DepartmentService,
+    @inject(AdminAuditService) private readonly adminAudit: AdminAuditService,
   ) {}
 
   create = async (req: Request, res: Response): Promise<void> => {
@@ -98,11 +100,13 @@ export class DepartmentController {
       return;
     }
     try {
+      const auditActor = this.adminAudit.actorFromRequestOrHeader(req) ?? undefined;
       const data = await this.departments.create(
         scope.org_id,
         scope.account_id,
         actor.data,
         body.data,
+        auditActor,
       );
       res.status(201).json({ data });
     } catch (err) {
@@ -193,12 +197,14 @@ export class DepartmentController {
       return;
     }
     try {
+      const auditActor = this.adminAudit.actorFromRequestOrHeader(req) ?? undefined;
       const data = await this.departments.update(
         scope.org_id,
         scope.account_id,
         p.data.id,
         actor.data,
         body.data,
+        auditActor,
       );
       if (!data) {
         res.status(404).json({ error: "not found" });

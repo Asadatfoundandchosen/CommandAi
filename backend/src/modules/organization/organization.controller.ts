@@ -4,6 +4,7 @@ import { MongoServerError } from "mongodb";
 
 import { TYPES } from "../../types.js";
 import { CreditRatesService } from "../credits/credit-rates.service.js";
+import { AdminAuditService } from "../audit/admin-audit.service.js";
 import { InvalidStatusTransitionError } from "./organization.status-rules.js";
 import { OrganizationService } from "./organization.service.js";
 import {
@@ -24,6 +25,7 @@ export class OrganizationController {
     private readonly organizations: OrganizationService,
     @inject(TYPES.CreditRatesService)
     private readonly creditRates: CreditRatesService,
+    @inject(AdminAuditService) private readonly adminAudit: AdminAuditService,
   ) {}
 
   create = async (req: Request, res: Response): Promise<void> => {
@@ -125,7 +127,12 @@ export class OrganizationController {
       return;
     }
     try {
-      const data = await this.creditRates.setCustomRatesForOrg(p.data.id, body.data);
+      const auditActor = this.adminAudit.systemActorFromRequest(req);
+      const data = await this.creditRates.setCustomRatesForOrg(
+        p.data.id,
+        body.data,
+        auditActor,
+      );
       res.status(200).json({ data });
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to set credit rates";
@@ -140,7 +147,8 @@ export class OrganizationController {
       res.status(400).json({ error: p.error.flatten() });
       return;
     }
-    const data = await this.creditRates.clearCustomRatesForOrg(p.data.id);
+    const auditActor = this.adminAudit.systemActorFromRequest(req);
+    const data = await this.creditRates.clearCustomRatesForOrg(p.data.id, auditActor);
     res.status(200).json({ data });
   };
 

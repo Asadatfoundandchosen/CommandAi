@@ -17,6 +17,8 @@ import {
 import { upsertSsoMappingBodySchema } from "../auth/sso-mapping.validation.js";
 import { MfaPolicyController } from "../mfa-policy/mfa-policy.controller.js";
 import { upsertMfaPolicyBodySchema } from "../mfa-policy/mfa-policy.validation.js";
+import { RetentionController } from "../retention/retention.controller.js";
+import { upsertRetentionPolicyBodySchema } from "../retention/retention.validation.js";
 import { upsertScimConfigBodySchema } from "../scim/scim.validation.js";
 import { OrganizationOidcController } from "./organization-oidc.controller.js";
 import { OrganizationSamlController } from "./organization-saml.controller.js";
@@ -141,6 +143,7 @@ import { OrganizationController } from "./organization.controller.js";
 export function createOrganizationTenantRouter(container: Container): Router {
   const controller = container.get(OrganizationController);
   const mfaPolicy = container.get(MfaPolicyController);
+  const retentionPolicy = container.get(RetentionController);
   const orgSaml = container.get(OrganizationSamlController);
   const orgOidc = container.get(OrganizationOidcController);
   const ssoMapping = container.get(OrganizationSsoMappingController);
@@ -152,6 +155,15 @@ export function createOrganizationTenantRouter(container: Container): Router {
   router.get("/mfa-policy", (req, res) => mfaPolicy.get(req, res));
   router.put("/mfa-policy", validateZodBody(upsertMfaPolicyBodySchema), (req, res) =>
     mfaPolicy.upsert(req, res),
+  );
+  router.get("/retention-policy", (req, res) => retentionPolicy.get(req, res));
+  router.get("/retention-policy/compliance-report", (req, res) =>
+    retentionPolicy.complianceReport(req, res),
+  );
+  router.put(
+    "/retention-policy",
+    validateZodBody(upsertRetentionPolicyBodySchema),
+    (req, res) => retentionPolicy.upsert(req, res),
   );
   router.get("/saml", (req, res) => orgSaml.get(req, res));
   router.put("/saml", validateZodBody(upsertOrgSamlConfigBodySchema), (req, res) =>

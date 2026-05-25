@@ -289,7 +289,11 @@ export class AuthController {
     try {
       const refreshToken =
         parsed.data.refreshToken ?? readRefreshTokenFromCookie(req);
-      await this.auth.logout(accessToken, refreshToken);
+      await this.auth.logout(
+        accessToken,
+        refreshToken,
+        extractClientContext(req),
+      );
       clearAuthCookiesOnLogout(res);
       res.status(204).send();
     } catch (e) {
@@ -317,6 +321,7 @@ export class AuthController {
         caller.org_id,
         role,
         parsed.data.user_id,
+        extractClientContext(req),
       );
       res.status(200).json({ data: result });
     } catch (e) {
@@ -369,6 +374,7 @@ export class AuthController {
       const result = await this.mfa.verifyAndEnableTOTP(
         caller.sub,
         parsed.data.token,
+        extractClientContext(req),
       );
       res.status(200).json({ data: result });
     } catch (e) {
@@ -454,7 +460,11 @@ export class AuthController {
       return;
     }
     try {
-      await this.mfa.disableTOTP(caller.sub, parsed.data.token);
+      await this.mfa.disableTOTP(
+        caller.sub,
+        parsed.data.token,
+        extractClientContext(req),
+      );
       res.status(204).send();
     } catch (e) {
       if (e instanceof MfaNotEnabledError) {
@@ -547,6 +557,7 @@ export class AuthController {
       const result = await this.smsMfa.verifyAndEnableSmsMfa(
         caller.sub,
         parsed.data.code,
+        extractClientContext(req),
       );
       res.status(200).json({ data: result });
     } catch (e) {
@@ -567,7 +578,7 @@ export class AuthController {
       return;
     }
     try {
-      await this.smsMfa.disableSmsMfa(caller.sub);
+      await this.smsMfa.disableSmsMfa(caller.sub, extractClientContext(req));
       res.status(204).send();
     } catch (e) {
       if (e instanceof SmsMfaNotEnabledError) {
@@ -611,7 +622,12 @@ export class AuthController {
       return;
     }
     try {
-      await this.auth.revokeMySession(caller.sub, parsed.data.id);
+      await this.auth.revokeMySession(
+        caller.sub,
+        parsed.data.id,
+        extractClientContext(req),
+        caller.org_id,
+      );
       res.status(204).send();
     } catch (e) {
       if (e instanceof SessionNotFoundError) {
@@ -631,7 +647,11 @@ export class AuthController {
       return;
     }
     try {
-      const result = await this.auth.revokeAllMySessions(caller.sub);
+      const result = await this.auth.revokeAllMySessions(
+        caller.sub,
+        caller.org_id,
+        extractClientContext(req),
+      );
       clearAuthCookiesOnLogout(res);
       res.status(200).json({ data: result });
     } catch (e) {

@@ -5,12 +5,14 @@ import { z } from "zod";
 
 import { TYPES } from "../../types.js";
 import { WeakPasswordError } from "../auth/password.service.js";
+import { extractClientContext } from "../auth/client-context.js";
 import {
   AccountNotInOrganizationError,
   DepartmentNotInAccountError,
   PlanLimitExceededError,
   UserService,
 } from "./user.service.js";
+import { AdminAuditService } from "../audit/admin-audit.service.js";
 import {
   createUserBodySchema,
   updateUserBodySchema,
@@ -107,6 +109,7 @@ function resolveTenantScope(
 export class UserController {
   constructor(
     @inject(TYPES.UserService) private readonly users: UserService,
+    @inject(AdminAuditService) private readonly adminAudit: AdminAuditService,
   ) {}
 
   create = async (req: Request, res: Response): Promise<void> => {
@@ -236,6 +239,7 @@ export class UserController {
       return;
     }
     try {
+      const auditActor = this.adminAudit.actorFromRequestOrHeader(req) ?? undefined;
       const data = await this.users.update(
         scope.org_id,
         scope.account_id,
@@ -243,6 +247,8 @@ export class UserController {
         p.data.id,
         actor.data,
         body.data,
+        extractClientContext(req),
+        auditActor,
       );
       if (!data) {
         res.status(404).json({ error: "not found" });

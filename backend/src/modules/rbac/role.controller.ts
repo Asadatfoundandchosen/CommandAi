@@ -18,6 +18,7 @@ import {
   RoleService,
   SystemRoleProtectedError,
 } from "./role.service.js";
+import { AdminAuditService } from "../audit/admin-audit.service.js";
 import {
   createRoleBodySchema,
   roleIdParamSchema,
@@ -29,6 +30,7 @@ export class RoleController {
   constructor(
     @inject(RoleService) private readonly roles: RoleService,
     @inject(PermissionResolverService) private readonly permissions: PermissionResolverService,
+    @inject(AdminAuditService) private readonly adminAudit: AdminAuditService,
   ) {}
 
   /** `GET /api/v1/roles/permissions` — schema + assignable permission catalog. */
@@ -149,7 +151,8 @@ export class RoleController {
       return;
     }
     try {
-      const data = await this.roles.createRole(orgId, parsed.data);
+      const actor = this.adminAudit.actorFromRequest(req);
+      const data = await this.roles.createRole(orgId, parsed.data, actor ?? undefined);
       res.status(201).json({ data });
     } catch (e) {
       this.handleError(res, e);
@@ -174,7 +177,13 @@ export class RoleController {
       return;
     }
     try {
-      const data = await this.roles.updateRole(orgId, idParsed.data, bodyParsed.data);
+      const actor = this.adminAudit.actorFromRequest(req);
+      const data = await this.roles.updateRole(
+        orgId,
+        idParsed.data,
+        bodyParsed.data,
+        actor ?? undefined,
+      );
       res.status(200).json({ data });
     } catch (e) {
       this.handleError(res, e);
@@ -194,7 +203,8 @@ export class RoleController {
       return;
     }
     try {
-      await this.roles.deleteRole(orgId, idParsed.data);
+      const actor = this.adminAudit.actorFromRequest(req);
+      await this.roles.deleteRole(orgId, idParsed.data, actor ?? undefined);
       res.status(204).send();
     } catch (e) {
       this.handleError(res, e);

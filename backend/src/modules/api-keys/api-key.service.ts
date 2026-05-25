@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 import { inject, injectable } from "inversify";
 import mongoose from "mongoose";
 
@@ -11,7 +9,9 @@ import {
 import { expandPermissions, normalizePermission } from "@modules/rbac/permission.js";
 import { validateRolePermissions } from "@modules/rbac/permissions.js";
 import { TYPES } from "../../types.js";
-import { AuditService } from "../audit/audit.service.js";
+import { AdminAuditService } from "../audit/admin-audit.service.js";
+import { ADMIN_EVENTS } from "../audit/admin-events.js";
+import type { AdminAuditActor } from "../audit/admin-audit.service.js";
 
 import {
   apiKeyDisplayPrefix,
@@ -97,14 +97,15 @@ export class ApiKeyService {
   constructor(
     @inject(TYPES.HierarchyValidator)
     private readonly hierarchy: HierarchyValidator,
-    @inject(TYPES.AuditService)
-    private readonly audit: AuditService,
+    @inject(AdminAuditService)
+    private readonly adminAudit: AdminAuditService,
   ) {}
 
   async createKey(
     orgId: string,
     createdBy: string,
     data: CreateApiKeyDTO,
+    auditActor?: AdminAuditActor,
   ): Promise<ApiKeyCreateResult> {
     await this.hierarchy.assertOrganizationExists(orgId);
     if (data.account_id) {
@@ -129,11 +130,15 @@ export class ApiKeyService {
       is_deleted: false,
     });
 
-    await this.logAudit(orgId, createdBy, "api_key.created", String(doc._id), {
-      name: doc.name,
-      account_id: data.account_id ?? null,
-      key_prefix: doc.key_prefix,
-    });
+    if (auditActor) {
+      await this.adminAudit.logAdminAction(
+        ADMIN_EVENTS.API_KEY_CREATED,
+        orgId,
+        auditActor,
+        { type: "api_key", id: String(doc._id), name: doc.name },
+        { after: toPublicView(doc) as unknown as Record<string, unknown> },
+      );
+    }
 
     return { ...toPublicView(doc), key: secret };
   }
@@ -167,6 +172,7 @@ export class ApiKeyService {
     id: string,
     updatedBy: string,
     data: UpdateApiKeyDTO,
+    auditActor?: AdminAuditActor,
   ): Promise<ApiKeyPublicView> {
     const doc = await APIKeyModel.findOne({
       _id: id,
@@ -176,6 +182,8 @@ export class ApiKeyService {
     if (!doc) {
       throw new ApiKeyNotFoundError(id);
     }
+
+    const before = toPublicView(doc.toObject() as IAPIKey);
 
     if (data.name !== undefined) {
       doc.name = data.name.trim();
@@ -195,18 +203,43 @@ export class ApiKeyService {
     doc.updated_by = new mongoose.Types.ObjectId(updatedBy);
     await doc.save();
 
-    await this.logAudit(orgId, updatedBy, "api_key.updated", id, { fields: Object.keys(data) });
+    const after = toPublicView(doc.toObject() as IAPIKey);
+    if (auditActor) {
+      const isRevoke =
+        data.is_active === false &&
+        Object.keys(data).length === 1;
+      await this.adminAudit.logAdminAction(
+        isRevoke ? ADMIN_EVENTS.API_KEY_REVOKED : ADMIN_EVENTS.API_KEY_UPDATED,
+        orgId,
+        auditActor,
+        { type: "api_key", id, name: after.name },
+        {
+          before: before as unknown as Record<string, unknown>,
+          after: after as unknown as Record<string, unknown>,
+        },
+      );
+    }
 
-    return toPublicView(doc);
+    return after;
   }
 
   /** Deactivate key (revoke). */
-  async revokeKey(orgId: string, id: string, updatedBy: string): Promise<ApiKeyPublicView> {
-    return this.updateKey(orgId, id, updatedBy, { is_active: false });
+  async revokeKey(
+    orgId: string,
+    id: string,
+    updatedBy: string,
+    auditActor?: AdminAuditActor,
+  ): Promise<ApiKeyPublicView> {
+    return this.updateKey(orgId, id, updatedBy, { is_active: false }, auditActor);
   }
 
   /** Issue a new secret; previous hash is replaced. Returns plaintext key once. */
-  async rotateKey(orgId: string, id: string, updatedBy: string): Promise<ApiKeyCreateResult> {
+  async rotateKey(
+    orgId: string,
+    id: string,
+    updatedBy: string,
+    auditActor?: AdminAuditActor,
+  ): Promise<ApiKeyCreateResult> {
     const doc = await APIKeyModel.findOne({
       _id: id,
       org_id: orgId,
@@ -216,6 +249,7 @@ export class ApiKeyService {
       throw new ApiKeyNotFoundError(id);
     }
 
+    const before = toPublicView(doc.toObject() as IAPIKey);
     const secret = generateApiKeySecret();
     doc.key_prefix = apiKeyDisplayPrefix(secret);
     doc.key_hash = hashApiKey(secret);
@@ -223,11 +257,21 @@ export class ApiKeyService {
     doc.updated_by = new mongoose.Types.ObjectId(updatedBy);
     await doc.save();
 
-    await this.logAudit(orgId, updatedBy, "api_key.rotated", id, {
-      key_prefix: doc.key_prefix,
-    });
+    const after = toPublicView(doc.toObject() as IAPIKey);
+    if (auditActor) {
+      await this.adminAudit.logAdminAction(
+        ADMIN_EVENTS.API_KEY_ROTATED,
+        orgId,
+        auditActor,
+        { type: "api_key", id, name: after.name },
+        {
+          before: { ...before, key_prefix: before.key_prefix },
+          after: { ...after, key_prefix: after.key_prefix },
+        },
+      );
+    }
 
-    return { ...toPublicView(doc), key: secret };
+    return { ...after, key: secret };
   }
 
   /**
@@ -284,30 +328,6 @@ export class ApiKeyService {
       throw new ApiKeyNotFoundError(id);
     }
     return doc;
-  }
-
-  private async logAudit(
-    orgId: string,
-    userId: string,
-    action: string,
-    resourceId: string,
-    changes: Record<string, unknown>,
-  ): Promise<void> {
-    try {
-      await this.audit.indexAuditEvent(
-        {
-          org_id: orgId,
-          user_id: userId,
-          action,
-          resource: "api_key",
-          resource_id: resourceId,
-          changes,
-        },
-        { id: `api-key-audit-${randomUUID()}` },
-      );
-    } catch (e) {
-      process.stderr.write(`[api-keys] audit log failed: ${String(e)}\n`);
-    }
   }
 }
 

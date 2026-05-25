@@ -36,6 +36,8 @@ export const TYPES = {
   CreditAlertService: Symbol.for("CreditAlertService"),
   AccountBudgetService: Symbol.for("AccountBudgetService"),
   CreditHistoryService: Symbol.for("CreditHistoryService"),
+  AuditExportService: Symbol.for("AuditExportService"),
+  RetentionService: Symbol.for("RetentionService"),
   ExecutionService: Symbol.for("ExecutionService"),
   HitlService: Symbol.for("HitlService"),
   MfaPolicyReminderService: Symbol.for("MfaPolicyReminderService"),

@@ -1,0 +1,48 @@
+{
+  "policy": {
+    "description": "audit-* append-only storage: read-only after 1d (ISM), warm merge at 7d, delete at 90d. Apply via PUT _plugins/_ism/policies/audit-immutable-lifecycle",
+    "default_state": "active_write",
+    "ism_template": [{ "index_patterns": ["audit-*"], "priority": 250 }],
+    "states": [
+      {
+        "name": "active_write",
+        "actions": [{ "index_priority": { "priority": 100 } }],
+        "transitions": [
+          {
+            "state_name": "immutable",
+            "conditions": { "min_index_age": "1d" }
+          }
+        ]
+      },
+      {
+        "name": "immutable",
+        "actions": [{ "read_only": {} }],
+        "transitions": [
+          {
+            "state_name": "warm",
+            "conditions": { "min_index_age": "7d" }
+          }
+        ]
+      },
+      {
+        "name": "warm",
+        "actions": [
+          {
+            "force_merge": { "max_num_segments": 1 }
+          }
+        ],
+        "transitions": [
+          {
+            "state_name": "delete",
+            "conditions": { "min_index_age": "90d" }
+          }
+        ]
+      },
+      {
+        "name": "delete",
+        "actions": [{ "delete": {} }],
+        "transitions": []
+      }
+    ]
+  }
+}

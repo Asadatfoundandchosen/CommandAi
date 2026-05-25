@@ -11,6 +11,9 @@ import {
   mergeCreditRates,
 } from "../../config/credit-rates.js";
 import { TYPES } from "../../types.js";
+import { AdminAuditService } from "../audit/admin-audit.service.js";
+import { ADMIN_EVENTS } from "../audit/admin-events.js";
+import type { AdminAuditActor } from "../audit/admin-audit.service.js";
 import { OrgSettingsModel } from "../organization/org-settings.model.js";
 import { OrganizationRepository } from "../organization/organization.repository.js";
 
@@ -28,6 +31,8 @@ export class CreditRatesService {
   constructor(
     @inject(TYPES.OrganizationRepository)
     private readonly organizations: OrganizationRepository,
+    @inject(AdminAuditService)
+    private readonly adminAudit: AdminAuditService,
   ) {}
 
   /** Resolved rate card for an org (enterprise custom rates merged over defaults). */
@@ -45,11 +50,14 @@ export class CreditRatesService {
   async setCustomRatesForOrg(
     orgId: string,
     input: SetOrgCreditRatesInput,
+    auditActor?: AdminAuditActor,
   ): Promise<CreditRatesResponse> {
     const org = await this.organizations.findById(orgId);
     if (!org) {
       throw new Error(`Organization not found: ${orgId}`);
     }
+
+    const before = await this.getRatesForOrg(orgId);
 
     const overrides = normalizeRateOverrides(input);
     if (Object.keys(overrides).length === 0) {
@@ -72,26 +80,61 @@ export class CreditRatesService {
       { upsert: true, new: true },
     );
 
-    return {
+    const response: CreditRatesResponse = {
       org_id: orgId,
       rates: merged,
       labels: CREDIT_RATE_LABELS,
       source: "custom",
     };
+
+    if (auditActor) {
+      await this.adminAudit.logAdminAction(
+        ADMIN_EVENTS.BILLING_RATES_CHANGED,
+        orgId,
+        auditActor,
+        { type: "organization", id: orgId, name: org.name },
+        {
+          before: { rates: before.rates, source: before.source },
+          after: { rates: response.rates, source: response.source },
+        },
+      );
+    }
+
+    return response;
   }
 
   /** Platform admin: remove custom rates (revert to platform defaults). */
-  async clearCustomRatesForOrg(orgId: string): Promise<CreditRatesResponse> {
+  async clearCustomRatesForOrg(
+    orgId: string,
+    auditActor?: AdminAuditActor,
+  ): Promise<CreditRatesResponse> {
+    const org = await this.organizations.findById(orgId);
+    const before = await this.getRatesForOrg(orgId);
     await OrgSettingsModel.deleteOne({
       org_id: new mongoose.Types.ObjectId(orgId),
       key: ORG_SETTINGS_CREDIT_RATES_KEY,
     });
-    return {
+    const response: CreditRatesResponse = {
       org_id: orgId,
       rates: { ...DEFAULT_RATES },
       labels: CREDIT_RATE_LABELS,
       source: "default",
     };
+
+    if (auditActor) {
+      await this.adminAudit.logAdminAction(
+        ADMIN_EVENTS.BILLING_RATES_CHANGED,
+        orgId,
+        auditActor,
+        { type: "organization", id: orgId, name: org?.name },
+        {
+          before: { rates: before.rates, source: before.source },
+          after: { rates: response.rates, source: response.source },
+        },
+      );
+    }
+
+    return response;
   }
 }
 

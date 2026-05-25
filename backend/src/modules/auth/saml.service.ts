@@ -6,6 +6,9 @@ import { decryptField, encryptField } from "@common/utils/field-encryption.js";
 import type { IOrganization, OrgSamlConfig } from "@modules/organization/organization.model.js";
 import { OrganizationModel } from "@modules/organization/organization.model.js";
 import { TYPES } from "../../types.js";
+import { AdminAuditService } from "../audit/admin-audit.service.js";
+import { ADMIN_EVENTS } from "../audit/admin-events.js";
+import type { AdminAuditActor } from "../audit/admin-audit.service.js";
 
 import { GroupMappingService } from "./group-mapping.service.js";
 import {
@@ -67,6 +70,7 @@ export class SamlService {
     @inject(TYPES.AuthService) private readonly auth: AuthService,
     @inject(JitProvisioningService) private readonly jit: JitProvisioningService,
     @inject(GroupMappingService) private readonly groupMapping: GroupMappingService,
+    @inject(AdminAuditService) private readonly adminAudit: AdminAuditService,
   ) {}
 
   spEntityId(orgId: string): string {
@@ -92,11 +96,14 @@ export class SamlService {
   async upsertOrgSamlConfig(
     orgId: string,
     body: UpsertOrgSamlConfigBody,
+    auditActor?: AdminAuditActor,
   ): Promise<OrgSamlConfigView> {
     const org = await this.loadOrg(orgId);
     if (!org) {
       throw new Error("Organization not found");
     }
+
+    const beforeView = org.saml ? this.toConfigView(orgId, org.saml) : null;
 
     let next: OrgSamlConfig = {
       ...(org.saml ?? { enabled: false, idp_login_url: "", idp_certificates: [] }),
@@ -156,7 +163,22 @@ export class SamlService {
       { $set: { saml: next } },
     );
 
-    return this.toConfigView(orgId, next);
+    const view = this.toConfigView(orgId, next);
+    if (auditActor) {
+      await this.adminAudit.logAdminAction(
+        ADMIN_EVENTS.SSO_CONFIGURED,
+        orgId,
+        auditActor,
+        { type: "organization", id: orgId, name: org.name },
+        {
+          ...(beforeView ? { before: ssoConfigAuditSnapshot(beforeView) } : {}),
+          after: ssoConfigAuditSnapshot(view),
+        },
+        { sso_type: "saml" },
+      );
+    }
+
+    return view;
   }
 
   /** SP-initiated login — redirect URL to IdP (Okta / Azure AD / OneLogin). */
@@ -383,4 +405,20 @@ export class SamlService {
       });
     });
   }
+}
+
+function ssoConfigAuditSnapshot(
+  config: Pick<
+    OrgSamlConfigView,
+  "enabled" | "provider" | "idp_login_url" | "idp_entity_id" | "idp_certificates" | "force_authn"
+  >,
+): Record<string, unknown> {
+  return {
+    enabled: config.enabled,
+    provider: config.provider,
+    idp_login_url: config.idp_login_url,
+    idp_entity_id: config.idp_entity_id,
+    idp_certificates_count: config.idp_certificates?.length ?? 0,
+    force_authn: config.force_authn,
+  };
 }

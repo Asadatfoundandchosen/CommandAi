@@ -7,6 +7,13 @@ export {
   lockedKey,
 } from "./lockout.service.js";
 export { LockoutAlertService } from "./lockout-alert.service.js";
+export { AuthAuditService, AUTH_EVENTS } from "./auth-audit.service.js";
+export type { AuthEventType } from "./auth-events.js";
+export {
+  AuthSuspiciousActivityService,
+  FAILED_LOGIN_ALERT_THRESHOLD,
+  FAILED_LOGIN_ALERT_WINDOW_SEC,
+} from "./auth-suspicious-activity.service.js";
 export { recordAccountLockout } from "./auth-metrics.js";
 export { AccountLockedError } from "./auth.service.js";
 export {

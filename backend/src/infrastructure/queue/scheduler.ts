@@ -6,6 +6,8 @@ import {
 } from "../../modules/contract/contract.expiry-notifications.js";
 import { CONTRACT_RENEWAL_DAILY_SCAN_JOB } from "../../modules/contract/contract-renewal.constants.js";
 import { MFA_POLICY_DAILY_REMINDER_JOB } from "../../modules/mfa-policy/mfa-policy.constants.js";
+import { ADMIN_WEEKLY_REPORT_JOB } from "../../modules/audit/admin-weekly-report.constants.js";
+import { AUDIT_RETENTION_DAILY_JOB } from "../../modules/retention/retention.constants.js";
 import type { NotificationJob } from "./queues/notification.queue.js";
 import type { SignalJob } from "./queues/signal.queue.js";
 
@@ -111,6 +113,32 @@ export const scheduledJobs: ScheduledJobEntry[] = [
       recipientKey: "mfa-policy-reminder",
       templateId: MFA_POLICY_DAILY_REMINDER_JOB,
       payload: { type: MFA_POLICY_DAILY_REMINDER_JOB },
+    },
+  },
+  {
+    kind: "notification",
+    name: ADMIN_WEEKLY_REPORT_JOB,
+    queue: queues.notifications,
+    cron: "0 9 * * 1",
+    timezone: "UTC",
+    data: {
+      orgId: "system",
+      recipientKey: "admin-weekly-audit",
+      templateId: ADMIN_WEEKLY_REPORT_JOB,
+      payload: { type: ADMIN_WEEKLY_REPORT_JOB },
+    },
+  },
+  {
+    kind: "notification",
+    name: AUDIT_RETENTION_DAILY_JOB,
+    queue: queues.notifications,
+    cron: "0 3 * * *",
+    timezone: "UTC",
+    data: {
+      orgId: "system",
+      recipientKey: "audit-retention-scan",
+      templateId: AUDIT_RETENTION_DAILY_JOB,
+      payload: { type: AUDIT_RETENTION_DAILY_JOB },
     },
   },
 ];

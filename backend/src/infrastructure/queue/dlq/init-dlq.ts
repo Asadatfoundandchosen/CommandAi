@@ -1,6 +1,7 @@
 import type { Queue, Worker } from "bullmq";
 
 import {
+  auditExportQueue,
   auditQueue,
   executionQueue,
   notificationQueue,
@@ -15,9 +16,9 @@ export function initAllDlqHandlers(workers: Worker[]): void {
   if (getDlqQueues().length > 0) {
     return;
   }
-  if (workers.length !== 5) {
+  if (workers.length !== 6) {
     process.stderr.write(
-      `[DLQ] expected 5 workers, got ${workers.length}; skipping DLQ wiring\n`,
+      `[DLQ] expected 6 workers, got ${workers.length}; skipping DLQ wiring\n`,
     );
     return;
   }
@@ -26,7 +27,8 @@ export function initAllDlqHandlers(workers: Worker[]): void {
     [executionQueue, workers[1]],
     [notificationQueue, workers[2]],
     [auditQueue, workers[3]],
-    [webhookDeliveryQueue, workers[4]],
+    [auditExportQueue, workers[4]],
+    [webhookDeliveryQueue, workers[5]],
   ];
   for (const [q, w] of pairs) {
     setupDLQ(q, w);

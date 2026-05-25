@@ -37,8 +37,13 @@ export function validateUploadSizeBytes(contentLengthBytes: number): void {
 
 export function assertKeyBelongsToOrg(orgId: string, key: string): void {
   const uploadPrefix = `uploads/${orgId}/`;
-  const auditPrefix = `audit-exports/${orgId}/`;
-  if (!key.startsWith(uploadPrefix) && !key.startsWith(auditPrefix)) {
+  const auditExportPrefix = `audit-exports/${orgId}/`;
+  const auditArchivePrefix = `audit-archives/${orgId}/`;
+  if (
+    !key.startsWith(uploadPrefix) &&
+    !key.startsWith(auditExportPrefix) &&
+    !key.startsWith(auditArchivePrefix)
+  ) {
     throw new FileServiceError("key does not belong to this organization");
   }
   if (key.includes("..") || key.startsWith("/")) {

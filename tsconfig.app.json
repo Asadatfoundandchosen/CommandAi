@@ -1,0 +1,62 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@shared/*": ["shared/*"]
+    }
+  },
+  "include": [
+    "src/main.tsx",
+    "src/App.tsx",
+    "src/vite-env.d.ts",
+    "src/index.css",
+    "src/components/**/*.tsx",
+    "src/components/notifications/**/*.tsx",
+    "src/store/**/*.ts",
+    "src/store/**/*.tsx",
+    "src/types/**/*.ts",
+    "src/config.ts",
+    "src/lib/utils.ts",
+    "src/lib/jwt.ts",
+    "src/services/**/*.ts",
+    "src/providers/**/*.tsx",
+    "src/hooks/**/*.ts",
+    "src/pages/**/*.tsx",
+    "src/routes/**/*.ts",
+    "shared/types/**/*.ts"
+  ],
+  "exclude": [
+    "src/datadog.ts",
+    "src/instrumentation.ts",
+    "src/main.ts",
+    "src/telemetry.ts",
+    "src/__ci__",
+    "src/lib/datadog-metrics.ts",
+    "src/lib/datadog-metrics*.ts",
+    "src/lib/logger.ts",
+    "src/lib/math.ts",
+    "src/lib/math.unit.test.ts",
+    "src/lib/trace-middleware.ts"
+  ]
+}

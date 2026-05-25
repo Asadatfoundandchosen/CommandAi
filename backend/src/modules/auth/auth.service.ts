@@ -29,6 +29,7 @@ import {
 } from "./mfa.service.js";
 import { SmsMfaService } from "./sms-mfa.service.js";
 import { SsoEnforcementService } from "./sso-enforcement.service.js";
+import { AuthAuditService } from "./auth-audit.service.js";
 
 export class InvalidCredentialsError extends Error {
   constructor() {
@@ -117,6 +118,7 @@ export class AuthService {
     @inject(MfaService) private readonly mfa: MfaService,
     @inject(SmsMfaService) private readonly smsMfa: SmsMfaService,
     @inject(SsoEnforcementService) private readonly ssoEnforcement: SsoEnforcementService,
+    @inject(AuthAuditService) private readonly authAudit: AuthAuditService,
   ) {}
 
   async login(
@@ -129,10 +131,22 @@ export class AuthService {
     const users = await this.findActiveUsersByEmail(email, orgIdHint);
     if (users.length === 0) {
       logAuthTokenOperation("login_failed", { reason: "invalid_credentials" });
+      await this.authAudit.logLoginFailed(clientContext, {
+        reason: "invalid_credentials",
+        email,
+        orgId: orgIdHint,
+        method: "password",
+      });
       throw new InvalidCredentialsError();
     }
     if (users.length > 1) {
       logAuthTokenOperation("login_failed", { reason: "ambiguous_email" });
+      await this.authAudit.logLoginFailed(clientContext, {
+        reason: "ambiguous_email",
+        email,
+        orgId: orgIdHint,
+        method: "password",
+      });
       throw new AmbiguousLoginError();
     }
     const user = users[0];
@@ -151,6 +165,13 @@ export class AuthService {
         user_id: userId,
         retry_after_sec: retryAfterSec,
       });
+      await this.authAudit.logLoginFailed(clientContext, {
+        reason: "account_locked",
+        email,
+        userId,
+        orgId: String(user.org_id),
+        method: "password",
+      });
       throw new AccountLockedError(retryAfterSec);
     }
 
@@ -164,6 +185,13 @@ export class AuthService {
         reason: "invalid_credentials",
         user_id: userId,
         failed_attempts: lockResult.attempts,
+      });
+      await this.authAudit.logLoginFailed(clientContext, {
+        reason: "invalid_credentials",
+        email,
+        userId,
+        orgId: String(user.org_id),
+        method: "password",
       });
       if (lockResult.locked) {
         await this.lockoutAlert.alertLockout({
@@ -180,10 +208,17 @@ export class AuthService {
         reason: "inactive",
         user_id: String(user._id),
       });
+      await this.authAudit.logLoginFailed(clientContext, {
+        reason: "inactive",
+        email,
+        userId,
+        orgId: String(user.org_id),
+        method: "password",
+      });
       throw new InactiveUserError();
     }
 
-    await this.assertMfaIfRequired(user, userId, mfaCode);
+    await this.assertMfaIfRequired(user, userId, mfaCode, clientContext);
 
     const userInputs = [
       user.email,
@@ -231,6 +266,12 @@ export class AuthService {
         user_id: userId,
         method: options?.method,
       });
+      await this.authAudit.logLoginFailed(clientContext, {
+        reason: "invalid_credentials",
+        userId,
+        orgId: user ? String(user.org_id) : undefined,
+        method: options?.method,
+      });
       throw new InvalidCredentialsError();
     }
 
@@ -242,10 +283,16 @@ export class AuthService {
         retry_after_sec: retryAfterSec,
         method: options?.method,
       });
+      await this.authAudit.logLoginFailed(clientContext, {
+        reason: "account_locked",
+        userId,
+        orgId: String(user.org_id),
+        method: options?.method,
+      });
       throw new AccountLockedError(retryAfterSec);
     }
 
-    await this.assertMfaIfRequired(user, userId, mfaCode);
+    await this.assertMfaIfRequired(user, userId, mfaCode, clientContext);
 
     const legacyHash = this.passwords.needsPasswordUpgrade(user.password_hash);
     const passwordChangeRequired =
@@ -265,6 +312,7 @@ export class AuthService {
     user: IUser,
     userId: string,
     mfaCode?: { totp_code?: string; backup_code?: string; sms_code?: string },
+    clientContext?: ClientContext,
   ): Promise<void> {
     if (!user.mfa_enabled) {
       return;
@@ -277,13 +325,23 @@ export class AuthService {
         reason: "mfa_required",
         user_id: userId,
       });
+      await this.authAudit.logLoginFailed(clientContext, {
+        reason: "mfa_required",
+        userId,
+        orgId: String(user.org_id),
+      });
       throw new MfaRequiredError();
     }
 
     let mfaOk = false;
+    let mfaMethod: "totp" | "sms" | "backup" = "totp";
     if (smsCode && user.mfa?.sms_enabled) {
       mfaOk = await this.smsMfa.verifySMSCode(userId, smsCode);
+      mfaMethod = "sms";
     } else if (totpOrBackup) {
+      if (mfaCode?.backup_code) {
+        mfaMethod = "backup";
+      }
       mfaOk = await this.mfa.verifyLoginMfa(user, totpOrBackup);
     }
 
@@ -294,11 +352,22 @@ export class AuthService {
         user_id: userId,
         failed_attempts: lockResult.attempts,
       });
+      await this.authAudit.logLoginFailed(clientContext, {
+        reason: "invalid_mfa",
+        userId,
+        orgId: String(user.org_id),
+      });
       if (lockResult.locked) {
         throw new AccountLockedError(lockResult.duration);
       }
       throw new InvalidMfaTokenError();
     }
+
+    await this.authAudit.logMfaVerified(clientContext, {
+      userId,
+      orgId: String(user.org_id),
+      method: mfaMethod,
+    });
   }
 
   private async finalizeSuccessfulLogin(
@@ -341,6 +410,22 @@ export class AuthService {
       password_change_required: passwordChangeRequired,
       method,
     });
+
+    await this.authAudit.logLoginSuccess(clientContext, {
+      userId,
+      orgId: String(user.org_id),
+      sessionId,
+      email: user.email,
+      method,
+    });
+
+    if (method === "magic_link") {
+      await this.authAudit.logPasswordReset(clientContext, {
+        userId,
+        orgId: String(user.org_id),
+        sessionId,
+      });
+    }
 
     return {
       ...toPublicTokens(tokens),
@@ -464,10 +549,21 @@ export class AuthService {
   }
 
   /** Blacklist access (and optional refresh) tokens on logout. */
-  async logout(accessToken: string, refreshToken?: string): Promise<void> {
+  async logout(
+    accessToken: string,
+    refreshToken?: string,
+    clientContext?: ClientContext,
+  ): Promise<void> {
+    let userId: string | undefined;
+    let orgId: string | undefined;
+    let sessionId: string | undefined;
+
     await this.tokenBlacklist.blacklistToken(accessToken);
     try {
       const accessClaims = this.jwt.verifyAccessToken(accessToken);
+      userId = accessClaims.sub;
+      orgId = accessClaims.org_id;
+      sessionId = accessClaims.sid;
       if (accessClaims.sid) {
         await this.sessions.revokeSession(accessClaims.sid, accessClaims.sub);
       }
@@ -478,6 +574,9 @@ export class AuthService {
       await this.tokenBlacklist.blacklistToken(refreshToken);
       try {
         const claims = this.jwt.verifyRefreshToken(refreshToken);
+        userId = claims.sub;
+        orgId = claims.org_id;
+        sessionId = claims.sid;
         await this.refreshStore.consume(claims.sub, claims.jti);
         if (claims.sid) {
           await this.sessions.revokeSession(claims.sid, claims.sub);
@@ -489,6 +588,14 @@ export class AuthService {
     logAuthTokenOperation("logout_success", {
       refresh_token_supplied: refreshToken !== undefined,
     });
+
+    if (userId && orgId) {
+      await this.authAudit.logLogout(clientContext, {
+        userId,
+        orgId,
+        sessionId,
+      });
+    }
   }
 
   /** Revoke all tokens after password change (no role check). */
@@ -506,6 +613,7 @@ export class AuthService {
     callerOrgId: string,
     callerRole: string,
     targetUserId?: string,
+    clientContext?: ClientContext,
   ): Promise<{ user_id: string; keys_removed: number }> {
     const userId = targetUserId ?? callerUserId;
 
@@ -526,6 +634,12 @@ export class AuthService {
 
     const keysRemoved = await this.tokenBlacklist.revokeAllUserTokens(userId);
     await this.sessions.revokeAllForUser(userId);
+    await this.authAudit.logSessionRevoked(clientContext, {
+      userId: callerUserId,
+      orgId: callerOrgId,
+      scope: userId === callerUserId ? "all" : "admin_revoke",
+      targetUserId: userId !== callerUserId ? userId : undefined,
+    });
     return { user_id: userId, keys_removed: keysRemoved };
   }
 
@@ -536,9 +650,22 @@ export class AuthService {
     return this.sessions.listSessions(userId, currentSessionId);
   }
 
-  async revokeMySession(userId: string, sessionId: string): Promise<void> {
+  async revokeMySession(
+    userId: string,
+    sessionId: string,
+    clientContext?: ClientContext,
+    orgId?: string,
+  ): Promise<void> {
     try {
       await this.sessions.revokeSession(sessionId, userId);
+      if (orgId) {
+        await this.authAudit.logSessionRevoked(clientContext, {
+          userId,
+          orgId,
+          sessionId,
+          scope: "single",
+        });
+      }
     } catch (e) {
       if (e instanceof SessionNotFoundError) {
         throw e;
@@ -547,10 +674,21 @@ export class AuthService {
     }
   }
 
-  async revokeAllMySessions(userId: string): Promise<{ sessions_revoked: number }> {
+  async revokeAllMySessions(
+    userId: string,
+    orgId?: string,
+    clientContext?: ClientContext,
+  ): Promise<{ sessions_revoked: number }> {
     const sessionsRevoked = await this.sessions.revokeAllForUser(userId);
     await this.refreshStore.invalidateAllUserTokens(userId);
     await this.tokenBlacklist.revokeAllUserTokens(userId);
+    if (orgId) {
+      await this.authAudit.logSessionRevoked(clientContext, {
+        userId,
+        orgId,
+        scope: "all",
+      });
+    }
     return { sessions_revoked: sessionsRevoked };
   }
 

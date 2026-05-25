@@ -2,6 +2,7 @@ import { Counter, type Registry } from "prom-client";
 
 let reuseCounter: Counter | undefined;
 let lockoutCounter: Counter | undefined;
+let suspiciousCounter: Counter | undefined;
 
 export function registerAuthMetrics(register: Registry): void {
   if (!reuseCounter) {
@@ -18,6 +19,14 @@ export function registerAuthMetrics(register: Registry): void {
       registers: [register],
     });
   }
+  if (!suspiciousCounter) {
+    suspiciousCounter = new Counter({
+      name: "auth_suspicious_activity_total",
+      help: "Suspicious authentication activity alerts (failed logins, new location, MFA disabled).",
+      labelNames: ["reason"],
+      registers: [register],
+    });
+  }
 }
 
 export function recordRefreshTokenReuse(): void {
@@ -26,4 +35,8 @@ export function recordRefreshTokenReuse(): void {
 
 export function recordAccountLockout(): void {
   lockoutCounter?.inc();
+}
+
+export function recordAuthSuspiciousActivity(reason: string): void {
+  suspiciousCounter?.labels(reason).inc();
 }

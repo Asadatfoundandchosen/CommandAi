@@ -1,0 +1,19 @@
+/** Side-effect imports — register all Mongoose models before audit plugin application. */
+import "@modules/account/account.model.js";
+import "@modules/api-keys/api-key.model.js";
+import "@modules/auth/group-mapping.model.js";
+import "@modules/auth/sso-mapping.model.js";
+import "@modules/connector/connector.model.js";
+import "@modules/contract/contract.model.js";
+import "@modules/credits/account-budget.model.js";
+import "@modules/credits/credit.model.js";
+import "@modules/department/department.model.js";
+import "@modules/mfa-policy/mfa-policy.model.js";
+import "@modules/organization/org-settings.model.js";
+import "@modules/organization/organization.model.js";
+import "@modules/rbac/role.model.js";
+import "@modules/scim/scim-config.model.js";
+import "@modules/scim/scim-group.model.js";
+import "@modules/user/user.model.js";
+import "@modules/webhooks/webhook.model.js";
+import "@modules/audit/audit.model.js";

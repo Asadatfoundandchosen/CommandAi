@@ -43,6 +43,8 @@ import { PasswordService } from "./modules/auth/password.service.js";
 import { RefreshTokenStore } from "./modules/auth/refresh-token.store.js";
 import { TokenBlacklistService } from "./modules/auth/token-blacklist.service.js";
 import { LockoutAlertService } from "./modules/auth/lockout-alert.service.js";
+import { AuthSuspiciousActivityService } from "./modules/auth/auth-suspicious-activity.service.js";
+import { AuthAuditService } from "./modules/auth/auth-audit.service.js";
 import { AuthSessionService } from "./modules/auth/auth-session.service.js";
 import { BackupCodesService } from "./modules/auth/backup-codes.service.js";
 import { MfaService } from "./modules/auth/mfa.service.js";
@@ -79,6 +81,13 @@ import { TokenReuseAlertService } from "./modules/auth/token-reuse-alert.service
 import { WebhookRepository } from "./modules/webhooks/webhook.repository.js";
 import { WebhookService } from "./modules/webhooks/webhook.service.js";
 import { AuditService } from "./modules/audit/audit.service.js";
+import { AuditController } from "./modules/audit/audit.controller.js";
+import { AuditExportService } from "./modules/audit/audit-export.service.js";
+import { AdminAuditService } from "./modules/audit/admin-audit.service.js";
+import { AdminCriticalAlertService } from "./modules/audit/admin-critical-alert.service.js";
+import { AdminWeeklyReportService } from "./modules/audit/admin-weekly-report.service.js";
+import { RetentionController } from "./modules/retention/retention.controller.js";
+import { RetentionService } from "./modules/retention/retention.service.js";
 import { FileService } from "./modules/files/file.service.js";
 import { FilesController } from "./modules/files/file.controller.js";
 import { SearchService } from "./modules/search/search.service.js";
@@ -213,9 +222,22 @@ container
   .to(MfaPolicyReminderService)
   .inSingletonScope();
 container.bind<MfaPolicyController>(MfaPolicyController).toSelf().inSingletonScope();
+container
+  .bind<RetentionService>(TYPES.RetentionService)
+  .to(RetentionService)
+  .inSingletonScope();
+container.bind<RetentionController>(RetentionController).toSelf().inSingletonScope();
 container.bind<LockoutService>(LockoutService).toSelf().inSingletonScope();
 container
   .bind<LockoutAlertService>(LockoutAlertService)
+  .toSelf()
+  .inSingletonScope();
+container
+  .bind<AuthSuspiciousActivityService>(AuthSuspiciousActivityService)
+  .toSelf()
+  .inSingletonScope();
+container
+  .bind<AuthAuditService>(AuthAuditService)
   .toSelf()
   .inSingletonScope();
 container
@@ -234,6 +256,20 @@ container
 container
   .bind<AuditService>(TYPES.AuditService)
   .to(AuditService)
+  .inSingletonScope();
+container
+  .bind<AuditExportService>(TYPES.AuditExportService)
+  .to(AuditExportService)
+  .inSingletonScope();
+container.bind<AuditController>(AuditController).toSelf().inSingletonScope();
+container.bind<AdminAuditService>(AdminAuditService).toSelf().inSingletonScope();
+container
+  .bind<AdminCriticalAlertService>(AdminCriticalAlertService)
+  .toSelf()
+  .inSingletonScope();
+container
+  .bind<AdminWeeklyReportService>(AdminWeeklyReportService)
+  .toSelf()
   .inSingletonScope();
 container
   .bind<SearchService>(TYPES.SearchService)

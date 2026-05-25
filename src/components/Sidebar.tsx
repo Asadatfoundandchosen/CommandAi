@@ -20,8 +20,8 @@ import {
   Activity,
   UserCog,
 } from 'lucide-react';
-import { useAuthStore } from '@/store/authStore';
-import { useActionQueueStore } from '@/store/actionQueueStore';
+import { useAppSelector } from '@/store/hooks';
+import { prefetchRouteForPath } from '@/routes/lazy-pages';
 import { UserRole } from '@/types';
 import { useState } from 'react';
 
@@ -40,14 +40,12 @@ const superAdminOps: NavItem[] = [
   { label: 'Orgs and Accounts', path: '/orgs-accounts', icon: Building2 },
   { label: 'Marketplace', path: '/marketplace', icon: Store },
   { label: 'Billing and Revenue', path: '/billing-revenue', icon: DollarSign },
-  { label: 'Platform Health', path: '/platform-health', icon: Activity },
+  { label: 'Web Vitals', path: '/performance', icon: Activity },
   { label: 'Team Management', path: '/team-management', icon: UserCog },
 ];
 
-const superAdminCustomerView: NavItem[] = [];
-
 const orgNav: NavItem[] = [
-  { label: 'Portfolio Overview', path: '/portfolio', icon: BarChart3 },
+  { label: 'Portfolio Overview', path: '/dashboard', icon: BarChart3 },
   { label: 'Accounts', path: '/accounts', icon: Building2 },
   { label: 'OKR Reporting', path: '/okr-reporting', icon: Target },
 ];
@@ -63,8 +61,10 @@ const accountNav: NavItem[] = [
 ];
 
 const Sidebar = () => {
-  const { user } = useAuthStore();
-  const pendingCount = useActionQueueStore((s) => s.actions.filter((a) => a.status === 'Pending').length);
+  const user = useAppSelector((s) => s.auth.user);
+  const pendingCount = useAppSelector(
+    (s) => s.ui.actionQueue.filter((a) => a.status === 'Pending').length,
+  );
   const location = useLocation();
   const navigate = useNavigate();
   const [contextOpen, setContextOpen] = useState(false);
@@ -134,11 +134,15 @@ const Sidebar = () => {
               </div>
             )}
             {section.items.map((item) => {
-              const active = location.pathname === item.path;
+              const active =
+                location.pathname === item.path ||
+                (item.path !== '/dashboard' && location.pathname.startsWith(`${item.path}/`));
               return (
                 <button
                   key={item.path}
                   onClick={() => navigate(item.path)}
+                  onMouseEnter={() => prefetchRouteForPath(item.path)}
+                  onFocus={() => prefetchRouteForPath(item.path)}
                   className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-body transition-colors ${
                     active
                       ? 'text-shell-accent border-l-[3px] border-shell-accent bg-shell-surface'

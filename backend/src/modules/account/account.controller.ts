@@ -19,6 +19,7 @@ import {
   OrganizationNotFoundError,
   PlanLimitExceededError,
 } from "./account.service.js";
+import { AdminAuditService } from "../audit/admin-audit.service.js";
 import {
   accountActorUserIdSchema,
   accountIdParamSchema,
@@ -56,6 +57,7 @@ export class AccountController {
     private readonly creditAllocation: CreditAllocationService,
     @inject(TYPES.AccountBudgetService)
     private readonly accountBudgets: AccountBudgetService,
+    @inject(AdminAuditService) private readonly adminAudit: AdminAuditService,
   ) {}
 
   create = async (req: Request, res: Response): Promise<void> => {
@@ -76,7 +78,8 @@ export class AccountController {
       return;
     }
     try {
-      const data = await this.accounts.create(orgId, actor.data, body.data);
+      const auditActor = this.adminAudit.actorFromRequestOrHeader(req) ?? undefined;
+      const data = await this.accounts.create(orgId, actor.data, body.data, auditActor);
       res.status(201).json({ data });
     } catch (err) {
       if (err instanceof OrganizationNotFoundError) {
@@ -152,11 +155,13 @@ export class AccountController {
       return;
     }
     try {
+      const auditActor = this.adminAudit.actorFromRequestOrHeader(req) ?? undefined;
       const data = await this.accounts.update(
         orgId,
         p.data.id,
         actor.data,
         body.data,
+        auditActor,
       );
       if (!data) {
         res.status(404).json({ error: "not found" });

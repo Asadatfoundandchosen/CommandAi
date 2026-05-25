@@ -8,6 +8,9 @@ import { PermissionCacheService } from "./permission-cache.service.js";
 import { PermissionResolverService } from "./permission-resolver.service.js";
 import { InvalidPermissionsError, validateRolePermissions } from "./permissions.js";
 import { SYSTEM_ROLE_DEFINITIONS, isSystemRoleName } from "./system-roles.js";
+import { AdminAuditService } from "../audit/admin-audit.service.js";
+import { ADMIN_EVENTS } from "../audit/admin-events.js";
+import type { AdminAuditActor } from "../audit/admin-audit.service.js";
 
 export { InvalidPermissionsError };
 
@@ -60,6 +63,8 @@ export class RoleService {
     private readonly permissionResolver: PermissionResolverService,
     @inject(PermissionCacheService)
     private readonly permissionCache: PermissionCacheService,
+    @inject(AdminAuditService)
+    private readonly adminAudit: AdminAuditService,
   ) {}
 
   /** Upsert built-in system roles (org_id null). Idempotent on startup. */
@@ -109,6 +114,7 @@ export class RoleService {
       permissions: string[];
       hierarchy_level: number;
     },
+    auditActor?: AdminAuditActor,
   ): Promise<RoleView> {
     if (isSystemRoleName(input.name)) {
       throw new InvalidPermissionsError("Name conflicts with a system role");
@@ -137,7 +143,17 @@ export class RoleService {
         hierarchy_level: input.hierarchy_level,
         is_deleted: false,
       });
-      return toView(doc.toObject() as IRole);
+      const view = toView(doc.toObject() as IRole);
+      if (auditActor) {
+        await this.adminAudit.logAdminAction(
+          ADMIN_EVENTS.ROLE_CREATED,
+          orgId,
+          auditActor,
+          { type: "role", id: view.id, name: view.name },
+          { after: { ...view } },
+        );
+      }
+      return view;
     } catch (e) {
       if (e instanceof MongoServerError && e.code === 11000) {
         throw new InvalidPermissionsError(`Role name already exists: ${input.name}`);
@@ -155,6 +171,7 @@ export class RoleService {
       permissions?: string[];
       hierarchy_level?: number;
     },
+    auditActor?: AdminAuditActor,
   ): Promise<RoleView> {
     const existing = await this.findAccessibleRole(orgId, roleId);
     if (existing.is_system) {
@@ -193,10 +210,27 @@ export class RoleService {
 
     await this.permissionCache.invalidateForRole(roleId).catch(() => undefined);
 
-    return toView(updated);
+    const view = toView(updated);
+    if (auditActor) {
+      await this.adminAudit.logAdminAction(
+        ADMIN_EVENTS.ROLE_UPDATED,
+        orgId,
+        auditActor,
+        { type: "role", id: view.id, name: view.name },
+        {
+          before: { ...toView(existing) },
+          after: { ...view },
+        },
+      );
+    }
+    return view;
   }
 
-  async deleteRole(orgId: string, roleId: string): Promise<void> {
+  async deleteRole(
+    orgId: string,
+    roleId: string,
+    auditActor?: AdminAuditActor,
+  ): Promise<void> {
     const existing = await this.findAccessibleRole(orgId, roleId);
     if (existing.is_system) {
       throw new SystemRoleProtectedError();
@@ -212,6 +246,16 @@ export class RoleService {
     }
 
     await this.permissionCache.invalidateForRole(roleId).catch(() => undefined);
+
+    if (auditActor) {
+      await this.adminAudit.logAdminAction(
+        ADMIN_EVENTS.ROLE_DELETED,
+        orgId,
+        auditActor,
+        { type: "role", id: roleId, name: existing.name },
+        { before: { ...toView(existing) } },
+      );
+    }
   }
 
   private async findAccessibleRole(orgId: string, roleId: string): Promise<IRole> {

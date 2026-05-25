@@ -1,5 +1,7 @@
 node_modules/
 dist/
+dist-web/
+dist-web/stats.html
 coverage/
 .env
 .env.local
@@ -8,6 +10,7 @@ backend/.env.local
 *.log
 .DS_Store
 backend/openapi.json
+shared/openapi/openapi.json
 
 # Terraform (also ignore caches outside submodule-local .gitignore scope)
 **/.terraform/

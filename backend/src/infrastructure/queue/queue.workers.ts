@@ -12,11 +12,17 @@ import type { WebhookService } from "../../modules/webhooks/webhook.service.js";
 import type { CreditAlertService } from "../../modules/credits/credit-alert.service.js";
 import { CREDIT_ALERT_TEMPLATE_ID } from "../../modules/credits/credit-alert.constants.js";
 import { MFA_POLICY_DAILY_REMINDER_JOB } from "../../modules/mfa-policy/mfa-policy.constants.js";
+import { ADMIN_WEEKLY_REPORT_JOB } from "../../modules/audit/admin-weekly-report.constants.js";
+import { AUDIT_RETENTION_DAILY_JOB } from "../../modules/retention/retention.constants.js";
+import type { RetentionService } from "../../modules/retention/retention.service.js";
 import type { MfaPolicyReminderService } from "../../modules/mfa-policy/mfa-policy-reminder.service.js";
+import { AdminWeeklyReportService } from "../../modules/audit/admin-weekly-report.service.js";
+import type { AuditExportService } from "../../modules/audit/audit-export.service.js";
 import type { SignalService } from "../../modules/signals/signals.service.js";
 import { TYPES } from "../../types.js";
 import type {
   AuditJob,
+  AuditExportJob,
   ExecutionJob,
   NotificationJob,
   SignalJob,
@@ -40,6 +46,16 @@ async function notificationProcessor(job: Job<NotificationJob>): Promise<void> {
       TYPES.MfaPolicyReminderService,
     );
     await reminders.processDailyReminderJob(job.data);
+    return;
+  }
+  if (templateId === ADMIN_WEEKLY_REPORT_JOB) {
+    const report = container.get(AdminWeeklyReportService);
+    await report.processWeeklyReportJob();
+    return;
+  }
+  if (templateId === AUDIT_RETENTION_DAILY_JOB) {
+    const retention = container.get<RetentionService>(TYPES.RetentionService);
+    await retention.processDailyRetentionJob();
     return;
   }
   if (
@@ -78,6 +94,11 @@ async function webhookDeliveryProcessor(job: Job<WebhookDeliveryJob>): Promise<v
   await svc.processDeliveryJob(job);
 }
 
+async function auditExportProcessor(job: Job<AuditExportJob>): Promise<void> {
+  const svc = container.get<AuditExportService>(TYPES.AuditExportService);
+  await svc.processExportJob(job.data.orgId, job.data.params, job.data.notifyEmail);
+}
+
 /** Starts one worker per named queue (signals, execution, notifications, audit). Idempotent. */
 export function startBullMqWorkers(): void {
   if (workers.length > 0) {
@@ -88,6 +109,7 @@ export function startBullMqWorkers(): void {
     createWorker<ExecutionJob>("execution", (job) => executionProcessor(job)),
     createWorker<NotificationJob>("notifications", (job) => notificationProcessor(job)),
     createWorker<AuditJob>("audit", (job) => stubProcessor("audit", job)),
+    createWorker<AuditExportJob>("audit-export", (job) => auditExportProcessor(job)),
     createWorker<WebhookDeliveryJob>("webhook-delivery", (job) =>
       webhookDeliveryProcessor(job),
     ),

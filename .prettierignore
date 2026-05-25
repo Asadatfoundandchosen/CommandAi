@@ -1,8 +1,9 @@
 node_modules
 dist
+dist-web
 coverage
-.terraform
-**/.terraform
+backend/dist
+backend/node_modules
 package-lock.json
-backend/openapi.json
-backend/src/types/openapi.generated.ts
+*.min.js
+*.min.css

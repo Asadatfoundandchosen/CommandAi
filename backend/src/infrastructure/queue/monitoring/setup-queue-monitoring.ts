@@ -21,6 +21,8 @@ import { registerPubSubMetrics } from "../../pubsub/pubsub-metrics.js";
 import { registerResponseCacheMetrics } from "./response-cache-metrics.js";
 import { registerCacheInvalidationMetrics } from "../../cache/cache-invalidation-metrics.js";
 import { registerAuthMetrics } from "../../../modules/auth/auth-metrics.js";
+import { registerAdminMetrics } from "../../../modules/audit/admin-metrics.js";
+import { registerAuditIntegrityMetrics } from "../../../modules/audit/audit-integrity-metrics.js";
 import { registerPermissionCacheMetrics } from "../../../modules/rbac/permission-cache.metrics.js";
 import { startSessionMetrics, stopSessionMetrics } from "./session-metrics.js";
 
@@ -37,6 +39,8 @@ export function setupQueueMonitoring(app: Express): void {
   registerCacheInvalidationMetrics(queueMetricsRegister);
   registerPubSubMetrics(queueMetricsRegister);
   registerAuthMetrics(queueMetricsRegister);
+  registerAdminMetrics(queueMetricsRegister);
+  registerAuditIntegrityMetrics(queueMetricsRegister);
   registerPermissionCacheMetrics(queueMetricsRegister);
   startMongoPoolMetrics(
     queueMetricsRegister,

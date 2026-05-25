@@ -1,5 +1,16 @@
 # Backend architecture (`backend/`)
 
+## Monorepo (`1commandai/platform`)
+
+| Directory | Tooling | Role |
+|-----------|---------|------|
+| `frontend/` | Lovable | UI prototype export |
+| `backend/` | Cursor | Express API |
+| `shared/types/` | Both | `User`, `Agent` contract types |
+| `shared/openapi/` | Both | Generated OpenAPI JSON |
+
+See **`docs/CURSOR-INTEGRATION.md`** and **`docs/API-CONTRACT.md`**.
+
 The **`backend/`** package is a **feature-based**, **layered** Express API: routes are thin, controllers orchestrate, services hold domain logic, validation uses **Zod**, and infrastructure (DB, cache, queue) stays at the edges.
 
 ## Principles

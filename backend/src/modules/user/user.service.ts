@@ -8,7 +8,11 @@ import {
 } from "../../common/validators/plan-limits.validator.js";
 import { TYPES } from "../../types.js";
 import { AuthService } from "../auth/auth.service.js";
+import { AuthAuditService } from "../auth/auth-audit.service.js";
+import type { ClientContext } from "../auth/auth-session.types.js";
 import { PasswordService } from "../auth/password.service.js";
+import { AdminAuditService } from "../audit/admin-audit.service.js";
+import type { AdminAuditActor } from "../audit/admin-audit.service.js";
 import { PermissionCacheService } from "../rbac/permission-cache.service.js";
 import { SearchService } from "../search/search.service.js";
 import type { IUserPublic } from "./user.model.js";
@@ -44,8 +48,11 @@ export class UserService {
     private readonly planLimits: PlanLimitsValidator,
     @inject(TYPES.AuthService) private readonly auth: AuthService,
     @inject(TYPES.PasswordService) private readonly passwords: PasswordService,
+    @inject(AuthAuditService) private readonly authAudit: AuthAuditService,
     @inject(PermissionCacheService)
     private readonly permissionCache: PermissionCacheService,
+    @inject(AdminAuditService)
+    private readonly adminAudit: AdminAuditService,
   ) {}
 
   private passwordUserInputs(
@@ -121,6 +128,8 @@ export class UserService {
     id: string,
     actorUserId: string,
     input: UpdateUserInput,
+    clientContext?: ClientContext,
+    auditActor?: AdminAuditActor,
   ): Promise<IUserPublic | null> {
     await this.hierarchy.assertUserHierarchy(orgId, accountId, departmentId);
     const existing = await this.users.findByIdForScope(
@@ -171,11 +180,24 @@ export class UserService {
     if (next) {
       if (input.role !== undefined && input.role !== existing.role) {
         await this.permissionCache.invalidate(id).catch(() => undefined);
+        if (auditActor) {
+          await this.adminAudit.logUserRoleChange(orgId, auditActor, {
+            targetUserId: id,
+            beforeRole: existing.role,
+            afterRole: input.role,
+            targetEmail: existing.email,
+          });
+        }
       }
       if (input.password !== undefined) {
         await this.auth
           .revokeAllUserTokensOnPasswordChange(id)
           .catch(() => undefined);
+        await this.authAudit.logPasswordChanged(clientContext, {
+          userId: id,
+          orgId,
+          changedByUserId: actorUserId,
+        });
       }
       await this.syncSearch(next).catch(() => undefined);
     }

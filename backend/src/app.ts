@@ -44,12 +44,15 @@ import { createScimRouter } from "@modules/scim/index.js";
 import { createApiKeysRouter } from "@modules/api-keys/index.js";
 import { createRolesRouter } from "@modules/rbac/index.js";
 import { createCreditsRouter } from "@modules/credits/index.js";
+import { createAuditRouter } from "@modules/audit/audit.routes.js";
 import { createUsersRouter } from "@modules/users/index.js";
 import cors from "cors";
 import express, { type Express, type RequestHandler } from "express";
 import helmet from "helmet";
 import morgan from "morgan";
 import swaggerUi from "swagger-ui-express";
+
+import { createAuditContextMiddleware } from "@common/middleware/audit-context.middleware.js";
 
 import {
   createDlqRouter,
@@ -93,6 +96,7 @@ export function createApp(
     }),
   );
   app.use(cors());
+  app.use(createAuditContextMiddleware());
   /** Before rate limit so **429** lines appear in access logs. */
   app.use(morgan("combined"));
   /** Mount under `/api` only so `/health` probes do not create sessions in Redis. */
@@ -179,6 +183,15 @@ export function createApp(
     rejectCrossTenantOrgHint(),
     requireMinimumHierarchyRole("org_admin"),
     createCreditsRouter(container),
+  );
+
+  app.use(
+    "/api/v1/audit",
+    ...protectedApi,
+    createLoadUserPermissionsMiddleware(container),
+    rejectCrossTenantOrgHint(),
+    requireMinimumHierarchyRole("org_admin"),
+    createAuditRouter(container),
   );
 
   app.use(
